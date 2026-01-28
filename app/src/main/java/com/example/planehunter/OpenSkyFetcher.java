@@ -60,6 +60,9 @@ public class OpenSkyFetcher {
 
                 if (states != null) {
                     for (int i = 0; i < states.length(); i++) {
+                        if(states.optBoolean(8)){ //on ground
+                            break;
+                        }
                         JSONArray state = states.getJSONArray(i);
                         double lat = state.optDouble(6, Double.NaN);
                         double lon = state.optDouble(5, Double.NaN);

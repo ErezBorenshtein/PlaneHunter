@@ -5,18 +5,35 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
+
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+
+import android.location.Location;
+
+import java.util.ArrayList;
 
 public class PlaneService extends Service {
 
     private static final String CHANNEL_ID = "PlaneHunterChannel";
     private Handler handler;
     private Runnable task;
+
+    public ArrayList<Plane> planes;
+
+    private double currLat = 31.9936; // default
+    private double currLon = 34.8828; // default
+
+    private FusedLocationProviderClient locationClient;
 
     @Override
     public void onCreate() {
@@ -25,23 +42,47 @@ public class PlaneService extends Service {
 
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("PlaneHunter running")
-                .setContentText("Tracking planes near youu")
+                .setContentText("Tracking planes near you")
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .build();
 
         startForeground(1, notification);
 
-        handler = new Handler();
+        locationClient = LocationServices.getFusedLocationProviderClient(this);
+
+        handler = new Handler(Looper.getMainLooper());
         task = new Runnable() {
             @Override
             public void run() {
-                OpenSkyFetcher fetcher = new OpenSkyFetcher();
-                fetcher.fetchPlanes(currLot,currLat,planes -> {
-                    for (Plane plane : planes) {
-                        Log.d("banana","ICAO24: " + plane.icao24 + " Callsign: " + plane.callSign);
-                    }
-                });
-                handler.postDelayed(this, 60000);
+                // Get current location
+                if (ActivityCompat.checkSelfPermission(
+                        PlaneService.this,
+                        android.Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED) {
+
+                    locationClient.getLastLocation()
+                            .addOnSuccessListener(location -> {
+                                if (location != null) {
+                                    currLat = location.getLatitude();
+                                    currLon = location.getLongitude();
+                                }
+
+                                // Fetch planes at the updated location
+                                OpenSkyFetcher fetcher = new OpenSkyFetcher();
+                                fetcher.fetchPlanes(currLat, currLon, planes -> {
+
+                                });
+
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e("PlaneService", "Failed to get location", e);
+                            });
+
+                } else {
+                    Log.w("PlaneService", "Location permission not granted");
+                }
+
+                handler.postDelayed(this, 60000); // repeat every minute
             }
         };
 
@@ -51,6 +92,7 @@ public class PlaneService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         return START_STICKY;
+
     }
 
     @Override
@@ -65,14 +107,12 @@ public class PlaneService extends Service {
     }
 
     private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "PlaneHunter Background Service",
-                    NotificationManager.IMPORTANCE_LOW
-            );
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            manager.createNotificationChannel(channel);
-        }
+        NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "PlaneHunter Background Service",
+                NotificationManager.IMPORTANCE_LOW
+        );
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        manager.createNotificationChannel(channel);
     }
 }
