@@ -28,7 +28,7 @@ public class PlaneService extends Service {
     private Handler handler;
     private Runnable task;
 
-    public ArrayList<Plane> planes;
+    public ArrayList<Plane> planes = new ArrayList<Plane>();
 
     private double currLat = 31.9936; // default
     private double currLon = 34.8828; // default
@@ -39,6 +39,7 @@ public class PlaneService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+
 
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("PlaneHunter running")
@@ -54,7 +55,7 @@ public class PlaneService extends Service {
         task = new Runnable() {
             @Override
             public void run() {
-                // Get current location
+                // Get current location if there is permission
                 if (ActivityCompat.checkSelfPermission(
                         PlaneService.this,
                         android.Manifest.permission.ACCESS_FINE_LOCATION
@@ -67,10 +68,13 @@ public class PlaneService extends Service {
                                     currLon = location.getLongitude();
                                 }
 
-                                // Fetch planes at the updated location
+                                //Fetch planes at the current location
                                 OpenSkyFetcher fetcher = new OpenSkyFetcher();
-                                fetcher.fetchPlanes(currLat, currLon, planes -> {
-
+                                fetcher.fetchPlanes(currLat, currLon, planesFound -> {
+                                    synchronized (this){
+                                        planes.clear();
+                                        planes.addAll(planesFound);
+                                    }
                                 });
 
                             })
