@@ -1,93 +1,53 @@
 package com.example.planehunter;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
+import android.Manifest;
 import android.app.Service;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 
-import android.location.Location;
-
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class PlaneService extends Service {
 
-    private static final String CHANNEL_ID = "PlaneHunterChannel";
+    private static final String TAG = "PlaneServiceDebug";
+    private static final int FOREGROUND_ID = 1;
+
+    private static final long POLL_INTERVAL_MS = 60000L;          // 1 minute
+    private static final long NOTIFY_COOLDOWN_MS = 10 * 60000L;    // 10 minutes per aircraft
+
     private Handler handler;
     private Runnable task;
-
-    public ArrayList<Plane> planes = new ArrayList<Plane>();
-
-    private double currLat = 31.9936; // default
-    private double currLon = 34.8828; // default
-
     private FusedLocationProviderClient locationClient;
+
+    private final Object planesLock = new Object();
+    public final ArrayList<Plane> planes = new ArrayList<>();
+
+    private final Map<String, Long> lastNotifiedMsByIcao = new HashMap<>();
 
     @Override
     public void onCreate() {
         super.onCreate();
-        createNotificationChannel();
 
-
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("PlaneHunter running")
-                .setContentText("Tracking planes near you")
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .build();
-
-        startForeground(1, notification);
+        NotificationHelper.ensureChannels(this);
+        startForeground(FOREGROUND_ID, NotificationHelper.buildForegroundNotification(this));
 
         locationClient = LocationServices.getFusedLocationProviderClient(this);
 
         handler = new Handler(Looper.getMainLooper());
-        task = new Runnable() {
-            @Override
-            public void run() {
-                // Get current location if there is permission
-                if (ActivityCompat.checkSelfPermission(
-                        PlaneService.this,
-                        android.Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED) {
-
-                    locationClient.getLastLocation()
-                            .addOnSuccessListener(location -> {
-                                if (location != null) {
-                                    currLat = location.getLatitude();
-                                    currLon = location.getLongitude();
-                                }
-
-                                //Fetch planes at the current location
-                                OpenSkyFetcher fetcher = new OpenSkyFetcher();
-                                fetcher.fetchPlanes(currLat, currLon, planesFound -> {
-                                    synchronized (this){
-                                        planes.clear();
-                                        planes.addAll(planesFound);
-                                    }
-                                });
-
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e("PlaneService", "Failed to get location", e);
-                            });
-
-                } else {
-                    Log.w("PlaneService", "Location permission not granted");
-                }
-
-                handler.postDelayed(this, 60000); // repeat every minute
-            }
+        task = () -> {
+            pollOnce();
+            handler.postDelayed(task, POLL_INTERVAL_MS);
         };
 
         handler.post(task);
@@ -96,12 +56,11 @@ public class PlaneService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         return START_STICKY;
-
     }
 
     @Override
     public void onDestroy() {
-        handler.removeCallbacks(task);
+        if (handler != null && task != null) handler.removeCallbacks(task);
         super.onDestroy();
     }
 
@@ -110,13 +69,98 @@ public class PlaneService extends Service {
         return null;
     }
 
-    private void createNotificationChannel() {
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                "PlaneHunter Background Service",
-                NotificationManager.IMPORTANCE_LOW
-        );
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(channel);
+    private void pollOnce() {
+        if (!hasLocationPermission()) {
+            Log.w(TAG, "Location permission not granted");
+            return;
+        }
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                        this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+            return;
+        }
+        locationClient.getLastLocation()
+                .addOnSuccessListener(location -> {
+                    if (location == null) {
+                        Log.w(TAG, "Last location is null (GPS off / indoors / no recent fix)");
+                        return;
+                    }
+
+                    double lat = location.getLatitude();
+                    double lon = location.getLongitude();
+
+                    fetchAndNotify(lat, lon);
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to get location", e));
+    }
+
+    private void fetchAndNotify(double lat, double lon) {
+        OpenSkyFetcher fetcher = new OpenSkyFetcher();
+
+        fetcher.fetchPlanes(lat, lon, planesFound -> {
+            synchronized (planesLock) {
+                planes.clear();
+                planes.addAll(planesFound);
+            }
+
+            notifyIfNewPlane(planesFound);
+        });
+    }
+
+    private void notifyIfNewPlane(ArrayList<Plane> planesFound) {
+        if (planesFound == null || planesFound.isEmpty()) return;
+
+        long now = System.currentTimeMillis();
+
+        Plane candidate = null;
+
+        for (Plane p : planesFound) {
+            if (p == null) continue;
+
+            String icao = safe(p.getIcao24());
+            if (icao.isEmpty()) continue;
+
+            long last = lastNotifiedMsByIcao.containsKey(icao) ? lastNotifiedMsByIcao.get(icao) : 0L;
+            if (now - last >= NOTIFY_COOLDOWN_MS) {
+                candidate = p;
+                break;
+            }
+        }
+
+        if (candidate == null) return;
+
+        String icao = safe(candidate.getIcao24());
+        String call = safe(candidate.getCallSign());
+
+        int altM = (int) Math.round(candidate.getAltitude());
+
+        String title = "✈️ Plane nearby";
+        String text;
+
+        if (!call.isEmpty() && !call.equalsIgnoreCase("N/A")) {
+            text = call + " | ICAO: " + icao + " | Alt: " + altM + " m";
+        } else {
+            text = "ICAO: " + icao + " | Alt: " + altM + " m";
+        }
+
+        lastNotifiedMsByIcao.put(icao, now);
+
+        //? Stable per-aircraft notification id (won't spam new ids)
+        int notifId = Math.abs(icao.hashCode());
+
+        NotificationHelper.notifyPlaneFound(this, title, text, notifId);
+    }
+
+    private boolean hasLocationPermission() {
+        return ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private String safe(String s) {
+        return s == null ? "" : s.trim();
     }
 }

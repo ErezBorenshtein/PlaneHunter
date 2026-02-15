@@ -18,73 +18,82 @@ public class OpenSkyFetcher {
         void onPlanesFetched(ArrayList<Plane> planes);
     }
 
-    private double latCenter = 31.9936;
-    private double lonCenter = 34.8828;
-    private double radiusKm = 4; //? need to change after testing
+    private double radiusKm = 4.0;
 
-    public void fetchPlanes(double latCenter, double lonCenter,PlanesCallback callback) {
+    public void setRadiusKm(double radiusKm) {
+        this.radiusKm = Math.max(0.2, radiusKm);
+    }
+
+    public void fetchPlanes(double latCenter, double lonCenter, PlanesCallback callback) {
         new Thread(() -> {
             ArrayList<Plane> planes = new ArrayList<>();
+
             try {
-                if(latCenter !=0 && lonCenter !=0 ){
-                    this.latCenter = latCenter;
-                    this.lonCenter = lonCenter;
-                }
+                double[] bbox = boundingBox(latCenter, lonCenter, radiusKm);
 
-                double[] bbox = boundingBox(this.latCenter, this.lonCenter, radiusKm);
-
-                //the URL for the API request(using REST API)
                 String urlString = String.format(
                         "https://opensky-network.org/api/states/all?lamin=%f&lamax=%f&lomin=%f&lomax=%f",
                         bbox[0], bbox[1], bbox[2], bbox[3]
                 );
 
-                //Creates the connection using GET request
-                URL url = new URL(urlString);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
                 connection.setRequestMethod("GET");
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(8000);
 
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream())); //Used to read the data from the stream
+                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                 StringBuilder content = new StringBuilder();
                 String line;
-
-                while ((line = in.readLine()) != null){ //adds each line(Json element) to the stringBuilder
+                while ((line = in.readLine()) != null) {
                     content.append(line);
                 }
-                in.close(); //close stream
+                in.close();
                 connection.disconnect();
 
                 JSONObject data = new JSONObject(content.toString());
-                JSONArray states = data.optJSONArray("states"); //create JsonArray from the states
+                JSONArray states = data.optJSONArray("states");
 
                 if (states != null) {
                     for (int i = 0; i < states.length(); i++) {
-                        if(states.optBoolean(8)){ //on ground
-                            break;
-                        }
-                        JSONArray state = states.getJSONArray(i);
-                        double lat = state.optDouble(6, Double.NaN);
+                        JSONArray state = states.optJSONArray(i);
+                        if (state == null) continue;
+
+                        // OpenSky indices:
+                        // 0: icao24
+                        // 1: callsign
+                        // 5: longitude
+                        // 6: latitude
+                        // 7: baro_altitude (meters)
+                        // 8: on_ground
+                        // 10: true_track (degrees)
+                        boolean onGround = state.optBoolean(8, false);
+                        if (onGround) continue;
+
                         double lon = state.optDouble(5, Double.NaN);
-                        if (!Double.isNaN(lat) && !Double.isNaN(lon)) {
-                            double distance = haversine(latCenter, lonCenter, lat, lon);
-                            if (distance <= radiusKm) {
-                                String callSign = state.optString(1, "N/A").trim();
-                                String icao = state.getString(0);
-                                double altitude = state.optDouble(7, 0);
-                                planes.add(new Plane(icao, callSign, lat, lon, altitude));
-                            }
-                        }
+                        double lat = state.optDouble(6, Double.NaN);
+                        if (Double.isNaN(lat) || Double.isNaN(lon)) continue;
+
+                        double distanceKm = haversineKm(latCenter, lonCenter, lat, lon);
+                        if (distanceKm > radiusKm) continue;
+
+                        String icao = safe(state.optString(0, ""));
+                        String callSign = safe(state.optString(1, "N/A"));
+                        double altitude = state.optDouble(7, 0.0);
+                        double trackDeg = state.optDouble(10, Double.NaN);
+
+                        planes.add(new Plane(icao, callSign, lat, lon, altitude, trackDeg));
                     }
                 }
-
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
             new Handler(Looper.getMainLooper()).post(() -> callback.onPlanesFetched(planes));
-
         }).start();
+    }
+
+    private String safe(String s) {
+        return s == null ? "" : s.trim();
     }
 
     private double[] boundingBox(double lat, double lon, double radiusKm) {
@@ -93,8 +102,8 @@ public class OpenSkyFetcher {
         return new double[]{lat - deltaLat, lat + deltaLat, lon - deltaLon, lon + deltaLon};
     }
 
-    private double haversine(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371;
+    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371.0;
         double phi1 = Math.toRadians(lat1);
         double phi2 = Math.toRadians(lat2);
         double dPhi = Math.toRadians(lat2 - lat1);
@@ -102,6 +111,7 @@ public class OpenSkyFetcher {
 
         double a = Math.sin(dPhi / 2) * Math.sin(dPhi / 2)
                 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) * Math.sin(dLambda / 2);
+
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     }
