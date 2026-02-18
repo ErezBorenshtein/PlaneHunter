@@ -23,12 +23,14 @@ public class PlaneService extends Service {
     private static final String TAG = "PlaneServiceDebug";
     private static final int FOREGROUND_ID = 1;
 
-    private static final long POLL_INTERVAL_MS = 60000L;          // 1 minute
-    private static final long NOTIFY_COOLDOWN_MS = 10 * 60000L;    // 10 minutes per aircraft
+    private static final long POLL_INTERVAL_MS = 60000;          // 1 minute
+    private static final long NOTIFY_COOLDOWN_MS = 10 * 60000;    // 10 minutes per aircraft
 
     private Handler handler;
     private Runnable task;
     private FusedLocationProviderClient locationClient;
+
+    private OpenSkyFetcher fetcher;
 
     private final Object planesLock = new Object();
     public final ArrayList<Plane> planes = new ArrayList<>();
@@ -50,6 +52,8 @@ public class PlaneService extends Service {
             handler.postDelayed(task, POLL_INTERVAL_MS);
         };
 
+        fetcher = new OpenSkyFetcher();
+
         handler.post(task);
     }
 
@@ -70,14 +74,10 @@ public class PlaneService extends Service {
     }
 
     private void pollOnce() {
-        if (!hasLocationPermission()) {
-            Log.w(TAG, "Location permission not granted");
-            return;
-        }
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
-                PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                        this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED) {
 
             return;
         }
@@ -97,9 +97,8 @@ public class PlaneService extends Service {
     }
 
     private void fetchAndNotify(double lat, double lon) {
-        OpenSkyFetcher fetcher = new OpenSkyFetcher();
 
-        fetcher.fetchPlanes(lat, lon, planesFound -> {
+        this.fetcher.fetchPlanes(lat, lon, planesFound -> {
             synchronized (planesLock) {
                 planes.clear();
                 planes.addAll(planesFound);
@@ -136,7 +135,7 @@ public class PlaneService extends Service {
 
         int altM = (int) Math.round(candidate.getAltitude());
 
-        String title = "✈️ Plane nearby";
+        String title = "✈Plane nearby";
         String text;
 
         if (!call.isEmpty() && !call.equalsIgnoreCase("N/A")) {
@@ -151,13 +150,6 @@ public class PlaneService extends Service {
         int notifId = Math.abs(icao.hashCode());
 
         NotificationHelper.notifyPlaneFound(this, title, text, notifId);
-    }
-
-    private boolean hasLocationPermission() {
-        return ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED
-                || ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED;
     }
 
     private String safe(String s) {
