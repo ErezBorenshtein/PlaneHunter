@@ -17,8 +17,7 @@ public class OpenSkyFetcher {
     public interface PlanesCallback {
         void onPlanesFetched(ArrayList<Plane> planes);
     }
-
-    private double radiusKm = 100.0;
+    private double radiusKm = 4.0;
 
     public void fetchPlanes(double latCenter, double lonCenter, PlanesCallback callback) {
         new Thread(() -> {
@@ -110,5 +109,9 @@ public class OpenSkyFetcher {
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
+    }
+
+    public void setRadiusKm(double radiusKm) {
+        this.radiusKm = radiusKm;
     }
 }

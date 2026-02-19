@@ -24,8 +24,11 @@ public class RadarView extends View {
         Plane plane;
         float x;
         float y;
-        float hitR; // hit radius in px
+        float hitR;     // hit radius in px
+        float rotDeg;   // rotation degrees for drawing
     }
+
+    private static final float ICON_HEADING_OFFSET_DEG = -90f; //the default heading is right(-90 degs)
 
     private final Paint paintGrid = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintMe = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -37,13 +40,12 @@ public class RadarView extends View {
     private double userLat = 0.0;
     private double userLon = 0.0;
 
-    private double radarRangeMeters = 4000.0; // 4km
+    private double radarRangeMeters = 4000.0; // default 4km
     private float meRadiusPx = 14f;
 
-    // Plane icon
     private Bitmap planeBmpOriginal;
     private Bitmap planeBmpScaled;
-    private int planeIconSizePx = 56; // change size here
+    private int planeIconSizePx = 56;
 
     private OnPlaneClickListener listener;
 
@@ -54,10 +56,11 @@ public class RadarView extends View {
     private void init() {
         paintGrid.setStyle(Paint.Style.STROKE);
         paintGrid.setStrokeWidth(3f);
+        paintGrid.setARGB(255, 0, 180, 0);
 
         paintMe.setStyle(Paint.Style.FILL);
+        paintMe.setARGB(255, 0, 255, 0);
 
-        // Load PNG
         planeBmpOriginal = BitmapFactory.decodeResource(getResources(), R.drawable.air_plan);
         planeBmpScaled = scalePlaneBitmap(planeBmpOriginal, planeIconSizePx);
     }
@@ -107,9 +110,6 @@ public class RadarView extends View {
         float cy = h / 2f;
         float radius = Math.min(w, h) * 0.45f;
 
-        paintGrid.setARGB(255, 0, 180, 0);
-        paintMe.setARGB(255, 0, 255, 0);
-
         // Radar rings
         canvas.drawCircle(cx, cy, radius, paintGrid);
         canvas.drawCircle(cx, cy, radius * 0.66f, paintGrid);
@@ -122,7 +122,6 @@ public class RadarView extends View {
         // Me in center
         canvas.drawCircle(cx, cy, meRadiusPx, paintMe);
 
-        // Planes as PNG icons (centered on (x,y))
         Bitmap bmp = planeBmpScaled;
         if (bmp == null) return;
 
@@ -130,7 +129,11 @@ public class RadarView extends View {
 
         synchronized (lock) {
             for (Blip b : blips) {
-                canvas.drawBitmap(bmp, b.x - half, b.y - half, null);
+                canvas.save();
+                canvas.translate(b.x, b.y);
+                canvas.rotate(b.rotDeg);
+                canvas.drawBitmap(bmp, -half, -half, null);
+                canvas.restore();
             }
         }
     }
@@ -207,7 +210,14 @@ public class RadarView extends View {
             b.x = x;
             b.y = y;
 
-            // hit radius: half icon size with padding
+            // rotation by trackDeg (0=N) mapped to canvas, plus PNG heading offset
+            double track = p.getTrackDeg();
+            if (!Double.isNaN(track)) {
+                b.rotDeg = (float) track + ICON_HEADING_OFFSET_DEG;
+            } else {
+                b.rotDeg = 0f; // unknown
+            }
+
             int iconSize = (planeBmpScaled != null) ? planeBmpScaled.getWidth() : planeIconSizePx;
             b.hitR = Math.max(18f, iconSize * 0.65f);
 

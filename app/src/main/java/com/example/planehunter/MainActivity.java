@@ -8,6 +8,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -30,11 +31,18 @@ public class MainActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             if (!PlaneBroadcast.ACTION_PLANES_UPDATED.equals(intent.getAction())) return;
 
+            //Toast.makeText(context, "planes update received", Toast.LENGTH_SHORT).show();
+            Log.d("PlaneHunterDebug","planes update received");
+
             String planesJson = intent.getStringExtra(PlaneBroadcast.EXTRA_PLANES_JSON);
             double userLat = intent.getDoubleExtra(PlaneBroadcast.EXTRA_USER_LAT, 0.0);
             double userLon = intent.getDoubleExtra(PlaneBroadcast.EXTRA_USER_LON, 0.0);
 
             ArrayList<Plane> planes = PlaneBroadcast.planesFromJson(planesJson);
+
+            //Toast.makeText(context, "planes=" + planes.size(), Toast.LENGTH_SHORT).show();
+            Log.d("PlaneHunterDebug","planes=" + planes.size());
+
 
             radarView.setUserLocation(userLat, userLon);
             radarView.setPlanes(planes);
@@ -76,20 +84,31 @@ public class MainActivity extends AppCompatActivity {
         });
 
         btnStop.setOnClickListener(v -> stopPlaneService());
+
+
+        //! temporary
+        radarView.setRadarRangeMeters(100_000.0); // 100km
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-            registerReceiver(planesReceiver,
-                    new IntentFilter(PlaneBroadcast.ACTION_PLANES_UPDATED),
-                    Context.RECEIVER_NOT_EXPORTED);
+
+        IntentFilter f = new IntentFilter(PlaneBroadcast.ACTION_PLANES_UPDATED);
+        registerReceiver(planesReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+
+        setServicePollInterval(3_000L); //update every 3 seconds when app is opened
+
     }
+
 
     @Override
     protected void onStop() {
         unregisterReceiverSafe();
         super.onStop();
+
+        setServicePollInterval(60_000L); //update every minute when app is not running
+
     }
 
     private void unregisterReceiverSafe() {
@@ -145,4 +164,12 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.ACCESS_COARSE_LOCATION
         };
     }
+
+    private void setServicePollInterval(long ms) {
+        Intent i = new Intent(this, PlaneService.class);
+        i.setAction(PlaneService.ACTION_SET_POLL_INTERVAL);
+        i.putExtra(PlaneService.EXTRA_POLL_INTERVAL_MS, ms);
+        startService(i);
+    }
+
 }

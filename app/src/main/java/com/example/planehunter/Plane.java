@@ -7,10 +7,8 @@ public class Plane {
     public double lon;
     public double altitude;
 
-    // Direction of travel (degrees 0..360). NaN if unknown
-    public double trackDeg = Double.NaN;
+    public double trackDeg = Double.NaN; // Direction of travel. NaN if unknown
 
-    // Backward-compatible constructor (no track)
     public Plane(String icao24, String callSign, double lat, double lon, double altitude) {
         this.icao24 = icao24;
         this.callSign = callSign;
@@ -19,7 +17,6 @@ public class Plane {
         this.altitude = altitude;
     }
 
-    // New constructor with track
     public Plane(String icao24, String callSign, double lat, double lon, double altitude, double trackDeg) {
         this.icao24 = icao24;
         this.callSign = callSign;
