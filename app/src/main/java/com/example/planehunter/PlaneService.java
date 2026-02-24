@@ -26,6 +26,9 @@ public class PlaneService extends Service {
     // --- NEW: actions to control service behavior ---
     public static final String ACTION_SET_POLL_INTERVAL = "com.example.planehunter.SET_POLL_INTERVAL";
     public static final String EXTRA_POLL_INTERVAL_MS = "poll_interval_ms";
+    public static final String ACTION_SET_APP_FOREGROUND =
+            "com.example.planehunter.SET_APP_FOREGROUND";
+    public static final String EXTRA_APP_FOREGROUND = "app_foreground";
 
     // Defaults
     private static final long DEFAULT_POLL_INTERVAL_MS = 60_000L;  // 1 minute
@@ -33,6 +36,9 @@ public class PlaneService extends Service {
     private static final long MAX_POLL_INTERVAL_MS = 5 * 60_000L;  // safety clamp
 
     private static final long NOTIFY_COOLDOWN_MS = 10 * 60_000L;   // 10 minutes per aircraft
+
+    private static final long GLOBAL_NOTIFICATION_COOLDOWN_MS = 5 * 60_000L;
+    private long lastSummaryNotificationMs = 0;
 
     private Handler handler;
     private Runnable task;
@@ -46,6 +52,8 @@ public class PlaneService extends Service {
     public final ArrayList<Plane> planes = new ArrayList<>();
 
     private final Map<String, Long> lastNotifiedMsByIcao = new HashMap<>();
+
+    private boolean isAppInForeground = false;
 
     @Override
     public void onCreate() {
@@ -71,10 +79,21 @@ public class PlaneService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
-        if (intent != null && ACTION_SET_POLL_INTERVAL.equals(intent.getAction())) {
-            long ms = intent.getLongExtra(EXTRA_POLL_INTERVAL_MS, pollIntervalMs);
-            applyPollInterval(ms);
-            return START_STICKY;
+        if (intent != null) {
+
+            if (ACTION_SET_APP_FOREGROUND.equals(intent.getAction())) {
+                isAppInForeground =
+                        intent.getBooleanExtra(EXTRA_APP_FOREGROUND, false);
+
+                Log.d(TAG, "App foreground = " + isAppInForeground);
+                return START_STICKY;
+            }
+
+            if (ACTION_SET_POLL_INTERVAL.equals(intent.getAction())) {
+                long ms = intent.getLongExtra(EXTRA_POLL_INTERVAL_MS, pollIntervalMs);
+                applyPollInterval(ms);
+                return START_STICKY;
+            }
         }
 
         return START_STICKY;
@@ -145,44 +164,43 @@ public class PlaneService extends Service {
     }
 
     private void notifyIfNewPlane(ArrayList<Plane> planesFound) {
+
         if (planesFound == null || planesFound.isEmpty()) return;
+
+        // Do not show notifications while app is in foreground
+        if (isAppInForeground) {
+            return;
+        }
 
         long now = System.currentTimeMillis();
 
-        Plane candidate = null;
+        // Global cooldown to prevent spam (max once every 5 minutes)
+        if (now - lastSummaryNotificationMs < GLOBAL_NOTIFICATION_COOLDOWN_MS) {
+            return;
+        }
+
+        lastSummaryNotificationMs = now;
+
+        int count = planesFound.size();
+
+        // Find lowest altitude plane for display purposes
+        Plane closest = planesFound.get(0);
+        double minAlt = closest.getAltitude();
 
         for (Plane p : planesFound) {
-            if (p == null) continue;
-
-            String icao = safe(p.getIcao24());
-            if (icao.isEmpty()) continue;
-
-            long last = lastNotifiedMsByIcao.containsKey(icao) ? lastNotifiedMsByIcao.get(icao) : 0L;
-            if (now - last >= NOTIFY_COOLDOWN_MS) {
-                candidate = p;
-                break;
+            if (p.getAltitude() < minAlt) {
+                closest = p;
+                minAlt = p.getAltitude();
             }
         }
 
-        if (candidate == null) return;
+        String title = "✈ PlaneHunter";
+        String text = "There are " + count + " planes nearby. "
+                + "Lowest altitude: " + Math.round(closest.getAltitude()) + "m";
 
-        String icao = safe(candidate.getIcao24());
-        String call = safe(candidate.getCallSign());
+        // Fixed notification ID → updates existing notification instead of spamming
+        int notifId = 1001;
 
-        int altM = (int) Math.round(candidate.getAltitude());
-
-        String title = "✈Plane nearby";
-        String text;
-
-        if (!call.isEmpty() && !call.equalsIgnoreCase("N/A")) {
-            text = call + " | ICAO: " + icao + " | Alt: " + altM + " m";
-        } else {
-            text = "ICAO: " + icao + " | Alt: " + altM + " m";
-        }
-
-        lastNotifiedMsByIcao.put(icao, now);
-
-        int notifId = Math.abs(icao.hashCode());
         NotificationHelper.notifyPlaneFound(this, title, text, notifId);
     }
 

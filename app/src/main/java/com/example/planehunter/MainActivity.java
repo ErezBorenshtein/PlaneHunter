@@ -99,8 +99,9 @@ public class MainActivity extends AppCompatActivity {
 
         setServicePollInterval(3_000L); //update every 3 seconds when app is opened
 
-    }
+        setAppForegroundState(true);
 
+    }
 
     @Override
     protected void onStop() {
@@ -108,6 +109,8 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
 
         setServicePollInterval(60_000L); //update every minute when app is not running
+
+        setAppForegroundState(false);
 
     }
 
@@ -169,6 +172,13 @@ public class MainActivity extends AppCompatActivity {
         Intent i = new Intent(this, PlaneService.class);
         i.setAction(PlaneService.ACTION_SET_POLL_INTERVAL);
         i.putExtra(PlaneService.EXTRA_POLL_INTERVAL_MS, ms);
+        startService(i);
+    }
+
+    private void setAppForegroundState(boolean foreground) {
+        Intent i = new Intent(this, PlaneService.class);
+        i.setAction(PlaneService.ACTION_SET_APP_FOREGROUND);
+        i.putExtra(PlaneService.EXTRA_APP_FOREGROUND, foreground);
         startService(i);
     }
 

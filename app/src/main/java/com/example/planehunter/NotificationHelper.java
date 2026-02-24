@@ -4,7 +4,6 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
-import android.os.Build;
 
 import androidx.core.app.NotificationCompat;
 
@@ -14,7 +13,6 @@ public class NotificationHelper {
     public static final String CHANNEL_ID_ALERTS = "PlaneHunterAlerts";
 
     public static void ensureChannels(Context ctx) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
 
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
@@ -28,8 +26,13 @@ public class NotificationHelper {
         NotificationChannel alerts = new NotificationChannel(
                 CHANNEL_ID_ALERTS,
                 "PlaneHunter Alerts",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_LOW   // silent notifications
         );
+
+        // Disable sound, vibration and lights
+        alerts.setSound(null, null);
+        alerts.enableVibration(false);
+        alerts.enableLights(false);
 
         nm.createNotificationChannel(fg);
         nm.createNotificationChannel(alerts);
