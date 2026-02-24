@@ -1,7 +1,9 @@
-package com.example.planehunter;
+package com.example.planehunter.data.network;
 
 import android.os.Handler;
 import android.os.Looper;
+
+import com.example.planehunter.model.Plane;
 
 import org.json.JSONArray;
 import org.json.JSONObject;

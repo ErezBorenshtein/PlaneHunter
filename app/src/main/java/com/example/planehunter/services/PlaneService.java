@@ -1,4 +1,4 @@
-package com.example.planehunter;
+package com.example.planehunter.services;
 
 import android.Manifest;
 import android.app.Service;
@@ -11,6 +11,10 @@ import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
 
+import com.example.planehunter.notifications.NotificationHelper;
+import com.example.planehunter.data.network.OpenSkyFetcher;
+import com.example.planehunter.model.Plane;
+import com.example.planehunter.receivers.PlaneBroadcast;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 

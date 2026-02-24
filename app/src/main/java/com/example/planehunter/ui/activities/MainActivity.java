@@ -1,4 +1,4 @@
-package com.example.planehunter;
+package com.example.planehunter.ui.activities;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;
@@ -17,6 +17,13 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+
+import com.example.planehunter.notifications.NotificationHelper;
+import com.example.planehunter.model.Plane;
+import com.example.planehunter.receivers.PlaneBroadcast;
+import com.example.planehunter.services.PlaneService;
+import com.example.planehunter.R;
+import com.example.planehunter.ui.views.RadarView;
 
 import java.util.ArrayList;
 

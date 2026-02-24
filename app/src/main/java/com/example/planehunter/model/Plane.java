@@ -1,4 +1,4 @@
-package com.example.planehunter;
+package com.example.planehunter.model;
 
 public class Plane {
     public String icao24;

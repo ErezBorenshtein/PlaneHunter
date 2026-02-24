@@ -1,4 +1,4 @@
-package com.example.planehunter;
+package com.example.planehunter.util;
 
 public class RadarMath {
 

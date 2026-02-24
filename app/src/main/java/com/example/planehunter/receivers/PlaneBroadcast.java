@@ -1,6 +1,8 @@
-package com.example.planehunter;
+package com.example.planehunter.receivers;
 
 import android.content.Intent;
+
+import com.example.planehunter.model.Plane;
 
 import org.json.JSONArray;
 import org.json.JSONObject;

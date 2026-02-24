@@ -1,4 +1,4 @@
-package com.example.planehunter;
+package com.example.planehunter.notifications;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -6,6 +6,8 @@ import android.app.NotificationManager;
 import android.content.Context;
 
 import androidx.core.app.NotificationCompat;
+
+import com.example.planehunter.R;
 
 public class NotificationHelper {
 

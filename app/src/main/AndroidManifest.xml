@@ -22,13 +22,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PlaneHunter">
         <service
-            android:name=".PlaneService"
+            android:name=".services.PlaneService"
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="dataSync"></service>
 
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.activities.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

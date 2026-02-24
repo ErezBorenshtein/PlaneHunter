@@ -5,9 +5,9 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    tools:context=".ui.activities.MainActivity">
 
-    <com.example.planehunter.RadarView
+    <com.example.planehunter.ui.views.RadarView
         android:id="@+id/radarView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
