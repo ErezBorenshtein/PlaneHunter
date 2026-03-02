@@ -2,6 +2,7 @@ package com.example.planehunter.data.network;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.example.planehunter.model.Plane;
 
@@ -9,6 +10,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -16,13 +18,17 @@ import java.util.ArrayList;
 
 public class OpenSkyFetcher {
 
+    private static final String TAG = "OpenSkyFetcher";
+
     public interface PlanesCallback {
         void onPlanesFetched(ArrayList<Plane> planes);
     }
+
     private double radiusKm = 4.0;
 
     public void fetchPlanes(double latCenter, double lonCenter, PlanesCallback callback) {
         new Thread(() -> {
+
             ArrayList<Plane> planes = new ArrayList<>();
 
             try {
@@ -33,36 +39,40 @@ public class OpenSkyFetcher {
                         bbox[0], bbox[1], bbox[2], bbox[3]
                 );
 
+                Log.d(TAG, "Request URL: " + urlString);
+
                 HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(8000);
                 connection.setReadTimeout(8000);
+                //connection.setRequestProperty("X-Forwarded-For", "203.0.113.10"); //test because TOO
 
-                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                StringBuilder content = new StringBuilder();
-                String line;
-                while ((line = in.readLine()) != null) {
-                    content.append(line);
-                }
-                in.close();
+                int code = connection.getResponseCode();
+                Log.d(TAG, "HTTP code=" + code);
+
+                InputStream is = (code >= 200 && code < 300)
+                        ? connection.getInputStream()
+                        : connection.getErrorStream();
+
+                String body = readAll(is);
                 connection.disconnect();
 
-                JSONObject data = new JSONObject(content.toString());
+                if (code < 200 || code >= 300) {
+                    Log.e(TAG, "HTTP error body: " + body);
+                    postResult(callback, planes);
+                    return;
+                }
+
+                JSONObject data = new JSONObject(body);
                 JSONArray states = data.optJSONArray("states");
+
+                Log.d(TAG, "states array = " + (states == null ? "null" : states.length()));
 
                 if (states != null) {
                     for (int i = 0; i < states.length(); i++) {
                         JSONArray state = states.optJSONArray(i);
                         if (state == null) continue;
 
-                        // OpenSky indices:
-                        // 0: icao24
-                        // 1: callsign
-                        // 5: longitude
-                        // 6: latitude
-                        // 7: baro_altitude (meters)
-                        // 8: on_ground
-                        // 10: true_track (degrees)
                         boolean onGround = state.optBoolean(8, false);
                         if (onGround) continue;
 
@@ -81,12 +91,30 @@ public class OpenSkyFetcher {
                         planes.add(new Plane(icao, callSign, lat, lon, altitude, trackDeg));
                     }
                 }
+
+                Log.d(TAG, "Filtered planes count=" + planes.size());
+
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.e(TAG, "Fetch failed: " + e.getMessage(), e);
             }
 
-            new Handler(Looper.getMainLooper()).post(() -> callback.onPlanesFetched(planes));
+            postResult(callback, planes);
+
         }).start();
+    }
+
+    private void postResult(PlanesCallback callback, ArrayList<Plane> planes) {
+        new Handler(Looper.getMainLooper()).post(() -> callback.onPlanesFetched(planes));
+    }
+
+    private String readAll(InputStream is) throws Exception {
+        if (is == null) return "";
+        BufferedReader in = new BufferedReader(new InputStreamReader(is));
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = in.readLine()) != null) sb.append(line);
+        in.close();
+        return sb.toString();
     }
 
     private String safe(String s) {
@@ -115,5 +143,9 @@ public class OpenSkyFetcher {
 
     public void setRadiusKm(double radiusKm) {
         this.radiusKm = radiusKm;
+    }
+
+    public double getRadiusKm() {
+        return radiusKm;
     }
 }

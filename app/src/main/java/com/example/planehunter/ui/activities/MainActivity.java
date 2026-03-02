@@ -94,7 +94,8 @@ public class MainActivity extends AppCompatActivity {
 
 
         //! temporary
-        radarView.setRadarRangeMeters(100_000.0); // 100km
+        radarView.setRadarRangeMeters(1_000_000.0); // 600km
+        //radarView.setRadarRangeMeters(100_000.0); // 1000km
     }
 
     @Override
@@ -104,7 +105,8 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter f = new IntentFilter(PlaneBroadcast.ACTION_PLANES_UPDATED);
         registerReceiver(planesReceiver, f, Context.RECEIVER_NOT_EXPORTED);
 
-        setServicePollInterval(3_000L); //update every 3 seconds when app is opened
+        //setServicePollInterval(3_000L); //update every 3 seconds when app is opened
+        setServicePollInterval(15_000L); //update every 3 seconds when app is opened
 
         setAppForegroundState(true);
 
