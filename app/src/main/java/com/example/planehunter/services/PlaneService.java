@@ -72,7 +72,7 @@ public class PlaneService extends Service {
         locationClient = LocationServices.getFusedLocationProviderClient(this);
 
         fetcher = new OpenSkyFetcher();
-        fetcher.setRadiusKm(1000); // your setting
+        fetcher.setRadiusKm(300); // your setting
 
         handler = new Handler(Looper.getMainLooper());
         task = () -> {

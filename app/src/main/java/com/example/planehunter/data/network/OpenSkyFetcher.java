@@ -45,7 +45,7 @@ public class OpenSkyFetcher {
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(8000);
                 connection.setReadTimeout(8000);
-                //connection.setRequestProperty("X-Forwarded-For", "203.0.113.10"); //test because TOO
+                //connection.setRequestProperty("X-Forwarded-For", "203.0.113.10"); //test because TOO many requests
 
                 int code = connection.getResponseCode();
                 Log.d(TAG, "HTTP code=" + code);

@@ -18,16 +18,18 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
-import com.example.planehunter.notifications.NotificationHelper;
+import com.example.planehunter.R;
 import com.example.planehunter.model.Plane;
+import com.example.planehunter.notifications.NotificationHelper;
 import com.example.planehunter.receivers.PlaneBroadcast;
 import com.example.planehunter.services.PlaneService;
-import com.example.planehunter.R;
 import com.example.planehunter.ui.views.RadarView;
 
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG = "PlaneHunterDebug";
 
     private RadarView radarView;
     private Button btnStart;
@@ -38,8 +40,7 @@ public class MainActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             if (!PlaneBroadcast.ACTION_PLANES_UPDATED.equals(intent.getAction())) return;
 
-            //Toast.makeText(context, "planes update received", Toast.LENGTH_SHORT).show();
-            Log.d("PlaneHunterDebug","planes update received");
+            Log.d(TAG, "planes update received");
 
             String planesJson = intent.getStringExtra(PlaneBroadcast.EXTRA_PLANES_JSON);
             double userLat = intent.getDoubleExtra(PlaneBroadcast.EXTRA_USER_LAT, 0.0);
@@ -47,20 +48,32 @@ public class MainActivity extends AppCompatActivity {
 
             ArrayList<Plane> planes = PlaneBroadcast.planesFromJson(planesJson);
 
-            //Toast.makeText(context, "planes=" + planes.size(), Toast.LENGTH_SHORT).show();
-            Log.d("PlaneHunterDebug","planes=" + planes.size());
-
+            Log.d(TAG, "planes=" + planes.size());
 
             radarView.setUserLocation(userLat, userLon);
             radarView.setPlanes(planes);
         }
     };
 
+    // Foreground permissions (location + notifications on Android 13+)
     private final ActivityResultLauncher<String[]> permissionsLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
-                boolean ok = hasAllRequiredPermissions();
-                if (!ok) {
+                if (!hasAllRequiredPermissions()) {
                     Toast.makeText(this, "Need location (and notifications) permission", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                // If foreground permissions are OK, request background separately (Android 10+)
+                requestBackgroundLocationIfNeeded();
+            });
+
+    // Background location permission (requested separately)
+    private final ActivityResultLauncher<String> backgroundLocationLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (!granted) {
+                    Toast.makeText(this,
+                            "Background location not granted (service may not update in background)",
+                            Toast.LENGTH_LONG).show();
                 }
             });
 
@@ -87,15 +100,17 @@ public class MainActivity extends AppCompatActivity {
             ensurePermissions();
             if (!hasAllRequiredPermissions()) return;
 
+            // Ask background (if needed) before starting the service
+            requestBackgroundLocationIfNeeded();
+
             startPlaneService();
         });
 
         btnStop.setOnClickListener(v -> stopPlaneService());
 
-
         //! temporary
-        radarView.setRadarRangeMeters(1_000_000.0); // 600km
-        //radarView.setRadarRangeMeters(100_000.0); // 1000km
+        radarView.setRadarRangeMeters(300_000.0); // 300km
+        //radarView.setRadarRangeMeters(100_000.0); // 100km
     }
 
     @Override
@@ -105,11 +120,10 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter f = new IntentFilter(PlaneBroadcast.ACTION_PLANES_UPDATED);
         registerReceiver(planesReceiver, f, Context.RECEIVER_NOT_EXPORTED);
 
-        //setServicePollInterval(3_000L); //update every 3 seconds when app is opened
-        setServicePollInterval(15_000L); //update every 3 seconds when app is opened
+        //setServicePollInterval(3_000L); // update every 3 seconds when app is opened
+        setServicePollInterval(15_000L); // update every 15 seconds when app is opened
 
         setAppForegroundState(true);
-
     }
 
     @Override
@@ -117,10 +131,8 @@ public class MainActivity extends AppCompatActivity {
         unregisterReceiverSafe();
         super.onStop();
 
-        setServicePollInterval(60_000L); //update every minute when app is not running
-
+        setServicePollInterval(60_000L); // update every minute when app is not running
         setAppForegroundState(false);
-
     }
 
     private void unregisterReceiverSafe() {
@@ -131,11 +143,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startPlaneService() {
         Intent i = new Intent(this, PlaneService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(i);
-        } else {
-            startService(i);
-        }
+        startForegroundService(i);
     }
 
     private void stopPlaneService() {
@@ -144,7 +152,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void ensurePermissions() {
-        if (hasAllRequiredPermissions()) return;
+        if (hasAllRequiredPermissions()) {
+            // If we already have required foreground permissions, we can still request background (if needed)
+            requestBackgroundLocationIfNeeded();
+            return;
+        }
 
         permissionsLauncher.launch(buildRequiredPermissionsArray());
     }
@@ -162,8 +174,30 @@ public class MainActivity extends AppCompatActivity {
         return hasLoc && hasNotif;
     }
 
+    private boolean hasBackgroundLocationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true; // No background permission pre-Android 10
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestBackgroundLocationIfNeeded() {
+        // Must request separately AFTER foreground location is granted
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return; // Android 9 and below
+        if (!hasForegroundLocationPermission()) return;            // don’t ask background before foreground
+        if (hasBackgroundLocationPermission()) return;
+
+        backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
+    }
+
+    private boolean hasForegroundLocationPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
     @NonNull
     private String[] buildRequiredPermissionsArray() {
+        // IMPORTANT: do NOT include ACCESS_BACKGROUND_LOCATION here.
+        // Android will only offer "While using the app" if you request background together with foreground.
         if (Build.VERSION.SDK_INT >= 33) {
             return new String[]{
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -190,5 +224,4 @@ public class MainActivity extends AppCompatActivity {
         i.putExtra(PlaneService.EXTRA_APP_FOREGROUND, foreground);
         startService(i);
     }
-
 }
