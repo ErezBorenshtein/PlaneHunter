@@ -169,7 +169,7 @@ public class PlaneService extends Service {
 
     private void fetchAndBroadcastAndUpdateFg(double lat, double lon) {
 
-        fetcher.fetchPlanes(lat, lon, planesFound -> {
+        fetcher.fetchPlanes(getApplicationContext(), lat, lon, planesFound -> {
 
             // Broadcast to app (Radar UI)
             Intent i = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);

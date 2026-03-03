@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.example.planehunter.R;
+import com.example.planehunter.data.firebase.FirebaseHandler;
 import com.example.planehunter.model.Plane;
 import com.example.planehunter.notifications.NotificationHelper;
 import com.example.planehunter.receivers.PlaneBroadcast;
@@ -63,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                // If foreground permissions are OK, request background separately (Android 10+)
+                // If foreground permissions are OK, request background separately
                 requestBackgroundLocationIfNeeded();
             });
 
@@ -80,6 +81,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (!FirebaseHandler.getInstance().isSignedIn()) {
+            startActivity(new Intent(this, LogIn.class));
+            finish();
+            return;
+        }
 
         NotificationHelper.ensureChannels(this);
 

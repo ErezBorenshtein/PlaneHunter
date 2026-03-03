@@ -1,89 +1,65 @@
 package com.example.planehunter.ui.activities;
 
-import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
+import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.planehunter.R;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
-
-import java.util.HashMap;
-
+import com.example.planehunter.data.firebase.FirebaseHandler;
 
 public class SignUp extends AppCompatActivity {
 
-    EditText etName,etSignupEmail,etSignupPassword;
-    Button btnSignup;
-    TextView tvHaveAccount;
-
-    FirebaseFirestore DB = FirebaseFirestore.getInstance();
-
-    private final FirebaseAuth auth = FirebaseAuth.getInstance();
+    private EditText etName;
+    private EditText etEmail;
+    private EditText etPassword;
+    private Button btnSignup;
+    private TextView tvHaveAccount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_sign_up);
 
         etName = findViewById(R.id.etName);
-        etSignupEmail = findViewById(R.id.etSignupEmail);
-        etSignupPassword = findViewById(R.id.etSignupPassword);
+        etEmail = findViewById(R.id.etSignupEmail);
+        etPassword = findViewById(R.id.etSignupPassword);
         btnSignup = findViewById(R.id.btnSignup);
         tvHaveAccount = findViewById(R.id.tvHaveAccount);
 
-        btnSignup.setOnClickListener(v -> {
-            signUp();
-        });
+        btnSignup.setOnClickListener(v -> doSignUp());
 
-        tvHaveAccount.setOnClickListener(view -> {
-            Intent intent = new Intent(SignUp.this, LogIn.class);
-            startActivity(intent);
-            finish();
-        });
+        tvHaveAccount.setOnClickListener(v -> finish());
     }
 
-    public void signUp() {
-        String name = etName.getText().toString();
-        String email = etSignupEmail.getText().toString();
-        String password = etSignupPassword.getText().toString();
+    private void doSignUp() {
+        String name = etName.getText().toString().trim();
+        String email = etEmail.getText().toString().trim();
+        String password = etPassword.getText().toString();
 
-        HashMap<String, Object> user = new HashMap<>();
-        user.put("name", name);
-        if(name.isEmpty() || email.isEmpty() || password.isEmpty()){
-            Toast.makeText(this, "name or email or password is empty", Toast.LENGTH_SHORT).show();
+        if (TextUtils.isEmpty(name) ||
+                TextUtils.isEmpty(email) ||
+                TextUtils.isEmpty(password)) {
+
+            Toast.makeText(this, "All fields required", Toast.LENGTH_LONG).show();
             return;
         }
 
-        auth.createUserWithEmailAndPassword(email, password)
-                .addOnSuccessListener(authResult -> {
-                    Intent intent = new Intent(SignUp.this, MainActivity.class);
-                    //intent.putExtra("name", name);
-                    Toast.makeText(this, auth.getUid(), Toast.LENGTH_SHORT).show();
-                    DB.collection("Notes")
-                            .document(auth.getUid())
-                            .set(user)
-                            .addOnSuccessListener(unused -> {
-                                Log.d("Erezs","User created successfully");
-                                Toast.makeText(this, "User created successfully", Toast.LENGTH_SHORT).show();
-                            })
-                            .addOnFailureListener(e->{
-                                Log.d("Erezs","Somthing went wrong");
-                            });
-
-                    startActivity(intent);
+        FirebaseHandler.getInstance()
+                .signUpEmail(email, password)
+                .continueWithTask(t ->
+                        FirebaseHandler.getInstance().ensureDefaultProfile(name)
+                )
+                .addOnSuccessListener(v -> {
+                    Toast.makeText(this, "Account created!", Toast.LENGTH_SHORT).show();
                     finish();
                 })
-                .addOnFailureListener(e->{
-                    Log.d("E","Somthing went wrong2");
-                });
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Sign up failed: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                );
     }
 }
