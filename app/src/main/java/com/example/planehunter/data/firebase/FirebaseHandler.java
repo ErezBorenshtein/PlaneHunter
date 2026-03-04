@@ -1,9 +1,13 @@
 package com.example.planehunter.data.firebase;
 
+import android.content.Context;
+import android.content.Intent;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.example.planehunter.model.UserProfile;
+import com.example.planehunter.ui.activities.LogIn;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.auth.AuthResult;
@@ -149,7 +153,7 @@ public class FirebaseHandler {
             DocumentSnapshot snap = tx.get(userRef);
 
             if (!snap.exists()) {
-                // אם אין פרופיל עדיין, ניצור אחד מינימלי
+
                 String fallbackName = "Player";
                 UserProfile p = new UserProfile(uid, fallbackName);
                 p.xp = xpToAdd;
@@ -173,7 +177,7 @@ public class FirebaseHandler {
             DocumentReference lbRef = db.collection("leaderboard").document(uid);
             String displayName = snap.exists() ? snap.getString("displayName") : "Player";
 
-            // נחשב XP חדש בזהירות: אם snap לא קיים, כבר שמנו xpToAdd
+
             long xpForLb;
             if (!snap.exists()) xpForLb = xpToAdd;
             else {

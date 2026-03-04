@@ -35,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private RadarView radarView;
     private Button btnStart;
     private Button btnStop;
+    private Button btnLogout;
 
     private final BroadcastReceiver planesReceiver = new BroadcastReceiver() {
         @Override
@@ -95,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
         radarView = findViewById(R.id.radarView);
         btnStart = findViewById(R.id.btnStart);
         btnStop = findViewById(R.id.btnStop);
+        btnLogout = findViewById(R.id.btnLogout);
 
         radarView.setOnPlaneClickListener(plane -> {
             String msg = "Call: " + plane.getCallSign()
@@ -115,6 +117,18 @@ public class MainActivity extends AppCompatActivity {
 
         btnStop.setOnClickListener(v -> stopPlaneService());
 
+        btnLogout.setOnClickListener(view -> {
+            FirebaseHandler.getInstance().signOut();
+
+            stopService(new Intent(this, com.example.planehunter.services.PlaneService.class));
+
+            Intent i = new Intent(this, LogIn.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(i);
+
+            finish();
+        });
+
         //! temporary
         radarView.setRadarRangeMeters(300_000.0); // 300km
         //radarView.setRadarRangeMeters(100_000.0); // 100km
@@ -128,7 +142,7 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(planesReceiver, f, Context.RECEIVER_NOT_EXPORTED);
 
         //setServicePollInterval(3_000L); // update every 3 seconds when app is opened
-        setServicePollInterval(15_000L); // update every 15 seconds when app is opened
+        setServicePollInterval(25_000L); // update every 25 seconds when app is opened
 
         setAppForegroundState(true);
     }
@@ -138,7 +152,7 @@ public class MainActivity extends AppCompatActivity {
         unregisterReceiverSafe();
         super.onStop();
 
-        setServicePollInterval(60_000L); // update every minute when app is not running
+        setServicePollInterval(60_000L*3); // update every 3 minutes when app is not running
         setAppForegroundState(false);
     }
 

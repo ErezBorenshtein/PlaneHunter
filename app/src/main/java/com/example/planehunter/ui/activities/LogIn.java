@@ -50,6 +50,11 @@ public class LogIn extends AppCompatActivity {
                 .signInEmail(email, password)
                 .addOnSuccessListener(r -> {
                     Toast.makeText(this, "Welcome back!", Toast.LENGTH_SHORT).show();
+
+                    Intent i = new Intent(LogIn.this, MainActivity.class);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(i);
+
                     finish();
                 })
                 .addOnFailureListener(e ->

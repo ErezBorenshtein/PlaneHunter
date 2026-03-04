@@ -11,6 +11,7 @@ import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
 
+import com.example.planehunter.R;
 import com.example.planehunter.data.network.OpenSkyFetcher;
 import com.example.planehunter.model.Plane;
 import com.example.planehunter.notifications.NotificationHelper;
@@ -72,7 +73,12 @@ public class PlaneService extends Service {
         locationClient = LocationServices.getFusedLocationProviderClient(this);
 
         fetcher = new OpenSkyFetcher();
-        fetcher.setRadiusKm(300); // your setting
+        fetcher.setAppContext(this);
+        fetcher.setRadiusKm(300);
+
+        String id = getString(R.string.opensky_client_id);
+        String secret = getString(R.string.opensky_client_secret);
+        fetcher.setClientCredentials(id, secret);
 
         handler = new Handler(Looper.getMainLooper());
         task = () -> {
@@ -169,7 +175,7 @@ public class PlaneService extends Service {
 
     private void fetchAndBroadcastAndUpdateFg(double lat, double lon) {
 
-        fetcher.fetchPlanes(getApplicationContext(), lat, lon, planesFound -> {
+        fetcher.fetchPlanes(lat, lon, planesFound -> {
 
             // Broadcast to app (Radar UI)
             Intent i = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);
