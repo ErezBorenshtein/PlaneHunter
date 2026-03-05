@@ -15,6 +15,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
@@ -24,6 +25,7 @@ import com.example.planehunter.model.Plane;
 import com.example.planehunter.notifications.NotificationHelper;
 import com.example.planehunter.receivers.PlaneBroadcast;
 import com.example.planehunter.services.PlaneService;
+import com.example.planehunter.ui.dialogs.PlaneSheet;
 import com.example.planehunter.ui.views.RadarView;
 
 import java.util.ArrayList;
@@ -36,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
     private Button btnStart;
     private Button btnStop;
     private Button btnLogout;
+
+    private boolean isLoggingOut = false;
 
     private final BroadcastReceiver planesReceiver = new BroadcastReceiver() {
         @Override
@@ -99,10 +103,20 @@ public class MainActivity extends AppCompatActivity {
         btnLogout = findViewById(R.id.btnLogout);
 
         radarView.setOnPlaneClickListener(plane -> {
-            String msg = "Call: " + plane.getCallSign()
-                    + " | ICAO: " + plane.getIcao24()
-                    + " | Alt: " + Math.round(plane.getAltitude()) + "m";
-            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+            radarView.setSelectedPlane(plane);
+            PlaneSheet sheet = PlaneSheet.newInstance(plane);
+
+            sheet.setListener(p -> {
+                Intent i = new Intent(this, CaptureGameActivity.class);
+                i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
+                i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
+                startActivityForResult(i, 2001);
+                // This will later connect to the XP / capture system
+                // capturePlane(p);
+            });
+
+            sheet.show(getSupportFragmentManager(), "plane_sheet");
+
         });
 
         btnStart.setOnClickListener(v -> {
@@ -118,14 +132,15 @@ public class MainActivity extends AppCompatActivity {
         btnStop.setOnClickListener(v -> stopPlaneService());
 
         btnLogout.setOnClickListener(view -> {
+            isLoggingOut = true;
+
             FirebaseHandler.getInstance().signOut();
 
-            stopService(new Intent(this, com.example.planehunter.services.PlaneService.class));
+            stopPlaneService();
 
             Intent i = new Intent(this, LogIn.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(i);
-
             finish();
         });
 
@@ -152,8 +167,24 @@ public class MainActivity extends AppCompatActivity {
         unregisterReceiverSafe();
         super.onStop();
 
-        setServicePollInterval(60_000L*3); // update every 3 minutes when app is not running
+        if (isLoggingOut) {
+            return;
+        }
+
+        setServicePollInterval(60_000L * 3);
         setAppForegroundState(false);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == 2001 && resultCode == RESULT_OK && data != null) {
+            boolean hit = data.getBooleanExtra(CaptureGameActivity.RESULT_HIT, false);
+            if (hit) {
+                // TODO: give XP + save capture to Firebase
+            }
+        }
     }
 
     private void unregisterReceiverSafe() {

@@ -112,7 +112,14 @@ public class PlaneService extends Service {
 
     @Override
     public void onDestroy() {
-        if (handler != null && task != null) handler.removeCallbacks(task);
+        Log.d(TAG, "PlaneService destroyed");
+
+        if (handler != null && task != null) {
+            handler.removeCallbacks(task);
+        }
+
+        stopForeground(true);
+
         super.onDestroy();
     }
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.example.planehunter.ui.views.CaptureGameView
+        android:id="@+id/captureView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Shutter button -->
+    <ImageButton
+        android:id="@+id/btnShutter"
+        android:layout_width="84dp"
+        android:layout_height="84dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="24dp"
+        android:background="@android:color/transparent"
+        android:src="@android:drawable/ic_menu_camera"
+        android:contentDescription="Shutter" />
+
+</FrameLayout>

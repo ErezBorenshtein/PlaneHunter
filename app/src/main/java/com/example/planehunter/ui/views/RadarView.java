@@ -36,6 +36,7 @@ public class RadarView extends View {
 
     private final Paint paintGrid = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintMe = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paintPulse = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final Object lock = new Object();
     private final List<Blip> blips = new ArrayList<>();
@@ -53,6 +54,9 @@ public class RadarView extends View {
 
     private OnPlaneClickListener listener;
 
+    private Plane selectedPlane = null;
+    private long pulseStartTime = 0;
+
     public RadarView(Context context) { super(context); init(); }
     public RadarView(Context context, @Nullable AttributeSet attrs) { super(context, attrs); init(); }
     public RadarView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) { super(context, attrs, defStyleAttr); init(); }
@@ -64,6 +68,11 @@ public class RadarView extends View {
 
         paintMe.setStyle(Paint.Style.FILL);
         paintMe.setARGB(255, 0, 255, 0);
+
+        // Selected-plane pulse ring (stroke only)
+        paintPulse.setStyle(Paint.Style.STROKE);
+        paintPulse.setStrokeWidth(4f);
+        paintPulse.setARGB(255, 255, 255, 0); // Yellow, alpha will be animated
 
         planeBmpOriginal = BitmapFactory.decodeResource(getResources(), R.drawable.air_plan);
         planeBmpScaled = scalePlaneBitmap(planeBmpOriginal, planeIconSizePx);
@@ -139,6 +148,7 @@ public class RadarView extends View {
                 canvas.drawBitmap(bmp, -half, -half, null);
                 canvas.restore();
             }
+            drawSelectedPlanePulse(canvas);
         }
     }
 
@@ -155,6 +165,11 @@ public class RadarView extends View {
         if (hit != null && listener != null) {
             listener.onPlaneClicked(hit);
         }
+
+        if (hit == null) {
+            setSelectedPlane(null); // clear selection
+            return true;
+        }
         return true;
     }
 
@@ -169,6 +184,12 @@ public class RadarView extends View {
             }
         }
         return null;
+    }
+
+    public void setSelectedPlane(@Nullable Plane plane) {
+        selectedPlane = plane;
+        pulseStartTime = System.currentTimeMillis();
+        invalidate();
     }
 
     // -------- Blip building --------
@@ -238,6 +259,53 @@ public class RadarView extends View {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         rebuildBlips();
+    }
+
+    private void drawSelectedPlanePulse(Canvas canvas) {
+
+        if (selectedPlane == null) return;
+
+        // Find the selected plane's current screen position from the built blips list.
+        // We do NOT recompute geometry here; we reuse the x/y already calculated in rebuildBlips().
+        Blip sb = null;
+        synchronized (lock) {
+            for (Blip b : blips) {
+                if (b == null || b.plane == null) continue;
+
+                // Reference match is usually enough because planes are from the same list object.
+                // Fallback: match by ICAO24 in case you rebuild Plane objects elsewhere.
+                if (b.plane == selectedPlane) {
+                    sb = b;
+                    break;
+                }
+                if (b.plane.getIcao24() != null && selectedPlane.getIcao24() != null
+                        && b.plane.getIcao24().equals(selectedPlane.getIcao24())) {
+                    sb = b;
+                    break;
+                }
+            }
+        }
+
+        if (sb == null) return;
+
+        long now = System.currentTimeMillis();
+        long t = now - pulseStartTime;
+
+        // Pulse period in ms (1.2 seconds). Phase goes 0..1.
+        final float periodMs = 1200f;
+        float phase = (t % (long) periodMs) / periodMs;
+
+        // Animate radius and alpha: ring expands and fades out.
+        float baseR = Math.max(18f, sb.hitR);
+        float radius = baseR + phase * (baseR * 1.2f);   // grows to ~2.2x
+        int alpha = (int) (255 * (1f - phase));
+
+        paintPulse.setAlpha(alpha);
+
+        canvas.drawCircle(sb.x, sb.y, radius, paintPulse);
+
+        // Keep the animation running while a plane is selected.
+        postInvalidateOnAnimation();
     }
 
     // -------- Bitmap utils --------
