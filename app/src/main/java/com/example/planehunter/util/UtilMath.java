@@ -1,8 +1,10 @@
 package com.example.planehunter.util;
 
-public class RadarMath {
+public class UtilMath {
 
     public static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+        //equation to calculate the distance between 2 points on a sphere(Haversine)
+        //https://math.stackexchange.com/questions/2799399/great-circle-distance-using-haversine-formula
         double R = 6371000.0; // meters
         double phi1 = Math.toRadians(lat1);
         double phi2 = Math.toRadians(lat2);

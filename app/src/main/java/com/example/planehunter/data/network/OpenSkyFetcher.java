@@ -1,11 +1,11 @@
 package com.example.planehunter.data.network;
 
-import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
 import com.example.planehunter.model.Plane;
+import com.example.planehunter.util.UtilMath;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,8 +31,6 @@ public class OpenSkyFetcher {
         void onPlanesFetched(ArrayList<Plane> planes);
     }
 
-    private Context appCtx;
-
     private double radiusKm = 4.0;
 
     // OAuth client credentials
@@ -44,13 +42,14 @@ public class OpenSkyFetcher {
     private String cachedToken = null;
     private long tokenExpiryMs = 0;
 
-    public void setAppContext(Context ctx) {
-        this.appCtx = ctx.getApplicationContext();
+    private static class TokenResponse {
+        String accessToken;
+        int expiresInSec;
     }
 
     public void setClientCredentials(String clientId, String clientSecret) {
-        this.clientId = safe(clientId);
-        this.clientSecret = safe(clientSecret);
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
         if (this.clientId.isEmpty() || this.clientSecret.isEmpty()) {
             this.clientId = null;
             this.clientSecret = null;
@@ -59,6 +58,7 @@ public class OpenSkyFetcher {
 
     public void fetchPlanes(double latCenter, double lonCenter, PlanesCallback callback) {
         new Thread(() -> {
+            //I need new thread for http request
 
             ArrayList<Plane> planes = new ArrayList<>();
 
@@ -72,53 +72,76 @@ public class OpenSkyFetcher {
 
                 Log.d(TAG, "Request URL: " + urlString);
 
+                //API docs: https://openskynetwork.github.io/opensky-api/
                 HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(8000);
                 connection.setReadTimeout(8000);
 
-                // ---- OAuth Bearer ----
+
                 String token = getValidToken();
                 if (token != null && !token.isEmpty()) {
                     connection.setRequestProperty("Authorization", "Bearer " + token);
                 } else {
-                    Log.w(TAG, "No token (will likely get 401). Check client_id/client_secret.");
+                    Log.d(TAG, "No token (will likely get 401). Check client_id/client_secret.");
                 }
 
                 int code = connection.getResponseCode();
                 Log.d(TAG, "HTTP code=" + code);
 
                 InputStream is = (code >= 200 && code < 300)
-                        ? connection.getInputStream()
-                        : connection.getErrorStream();
+                        ? connection.getInputStream() //for good response
+                        : connection.getErrorStream();//for bad response
 
-                String body = readAll(is);
+                String body = readAll(is); //read all data for bad or good response
                 connection.disconnect();
 
                 if (code < 200 || code >= 300) {
-                    Log.e(TAG, "HTTP error body: " + body);
-                    postResult(callback, planes);
+                    Log.d(TAG, "HTTP error body: " + body);
+                    postResult(callback, planes); //returns the result for the UI thread(Empty because its a bad response)
                     return;
                 }
 
-                JSONObject data = new JSONObject(body);
-                JSONArray states = data.optJSONArray("states");
+                // ------------------------------------------------------------
+                // OpenSky API response format (simplified)
+                //
+                // {
+                //   "time": 1710000000,
+                //   "states": [
+                //    ["4ca123","DLH123",...],
+                //    ["3c5abc","RYR55",...]
+                //  ]
+                // }
+                //
+                // Each aircraft is represented as an array.
+                // Important indices used below:
+                // 0 = icao24
+                // 1 = callsign
+                // 5 = longitude
+                // 6 = latitude
+                // 7 = altitude
+                // 8 = on_ground
+                // 10 = track
+                // ------------------------------------------------------------
+
+                JSONObject data = new JSONObject(body); //response is JSON
+                JSONArray states = data.optJSONArray("states"); //take only the states, time doesn't matter
 
                 Log.d(TAG, "states array = " + (states == null ? "null" : states.length()));
 
                 if (states != null) {
-                    for (int i = 0; i < states.length(); i++) {
+                    for (int i = 0; i < states.length(); i++) { //go over each state(plane)
                         JSONArray state = states.optJSONArray(i);
                         if (state == null) continue;
 
                         boolean onGround = state.optBoolean(8, false);
-                        if (onGround) continue;
+                        if (onGround) continue; //dismiss if on ground
 
                         double lon = state.optDouble(5, Double.NaN);
                         double lat = state.optDouble(6, Double.NaN);
                         if (Double.isNaN(lat) || Double.isNaN(lon)) continue;
 
-                        double distanceKm = haversineKm(latCenter, lonCenter, lat, lon);
+                        double distanceKm =UtilMath.haversineMeters(latCenter, lonCenter, lat, lon)/1000; //convert meters to KM
                         if (distanceKm > radiusKm) continue;
 
                         String icao = safe(state.optString(0, ""));
@@ -126,7 +149,7 @@ public class OpenSkyFetcher {
                         double altitude = state.optDouble(7, 0.0);
                         double trackDeg = state.optDouble(10, Double.NaN);
 
-                        planes.add(new Plane(icao, callSign, lat, lon, altitude, trackDeg));
+                        planes.add(new Plane(icao, callSign, lat, lon,altitude, null ,trackDeg));
                     }
                 }
 
@@ -136,7 +159,7 @@ public class OpenSkyFetcher {
                 Log.e(TAG, "Fetch failed: " + e.getMessage(), e);
             }
 
-            postResult(callback, planes);
+            postResult(callback, planes); //return result for main thread
 
         }).start();
     }
@@ -152,102 +175,89 @@ public class OpenSkyFetcher {
             }
         }
 
-        TokenResponse tr = fetchToken(clientId, clientSecret);
-        if (tr == null || tr.accessToken == null) return null;
+        TokenResponse tokenResponse = fetchToken(clientId, clientSecret);
+        if (tokenResponse == null || tokenResponse.accessToken == null) return null;
 
         synchronized (tokenLock) {
-            cachedToken = tr.accessToken;
-            tokenExpiryMs = now + (tr.expiresInSec * 1000L);
+            cachedToken = tokenResponse.accessToken;
+            tokenExpiryMs = now + (tokenResponse.expiresInSec * 1000L);
             return cachedToken;
         }
     }
 
     private TokenResponse fetchToken(String clientId, String clientSecret) {
-        HttpURLConnection conn = null;
+        //for OAuth2
+
+        HttpURLConnection connection = null;
         try {
             String body =
                     "grant_type=client_credentials" +
-                            "&client_id=" + URLEncoder.encode(clientId, "UTF-8") +
-                            "&client_secret=" + URLEncoder.encode(clientSecret, "UTF-8");
+                            "&client_id=" + URLEncoder.encode(clientId, "UTF-8") + //API client id
+                            "&client_secret=" + URLEncoder.encode(clientSecret, "UTF-8"); //API client secret
 
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
 
-            conn = (HttpURLConnection) new URL(TOKEN_URL).openConnection();
-            conn.setRequestMethod("POST");
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-            conn.setDoOutput(true);
-            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            connection = (HttpURLConnection) new URL(TOKEN_URL).openConnection();
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(8000);
+            connection.setReadTimeout(8000);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-            OutputStream os = conn.getOutputStream();
-            os.write(bytes);
-            os.flush();
-            os.close();
+            OutputStream outputStream = connection.getOutputStream();
+            outputStream.write(bytes);
+            outputStream.flush();
+            outputStream.close();
 
-            int code = conn.getResponseCode();
-            InputStream is = (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream();
-            String resp = readAll(is);
+            int responseCode = connection.getResponseCode();
+            InputStream inputStream = (responseCode >= 200 && responseCode < 300) ? connection.getInputStream() : connection.getErrorStream();
+            String response = readAll(inputStream);
 
-            if (code < 200 || code >= 300) {
-                Log.e(TAG, "Token HTTP " + code + " body=" + resp);
+            if (responseCode < 200 || responseCode >= 300) { //bad request
+                Log.e(TAG, "Token HTTP " + responseCode + " body=" + response);
                 return null;
             }
 
-            JSONObject j = new JSONObject(resp);
-            TokenResponse tr = new TokenResponse();
-            tr.accessToken = j.optString("access_token", null);
-            tr.expiresInSec = j.optInt("expires_in", 1800);
-            return tr;
+            JSONObject jsonResponse = new JSONObject(response);//response in json
+            TokenResponse tokenResponse = new TokenResponse();
+            tokenResponse.accessToken = jsonResponse.optString("access_token", null);
+            tokenResponse.expiresInSec = jsonResponse.optInt("expires_in", 1800);
+            return tokenResponse;
 
         } catch (Exception e) {
             Log.e(TAG, "Token fetch failed: " + e.getMessage(), e);
             return null;
         } finally {
-            if (conn != null) conn.disconnect();
+            if (connection != null) connection.disconnect();
         }
     }
 
-    private static class TokenResponse {
-        String accessToken;
-        int expiresInSec;
-    }
-
     private void postResult(PlanesCallback callback, ArrayList<Plane> planes) {
+        //posts the callback to the main thread so the result can update the UI.
         new Handler(Looper.getMainLooper()).post(() -> callback.onPlanesFetched(planes));
     }
 
-    private String readAll(InputStream is) throws Exception {
-        if (is == null) return "";
-        BufferedReader in = new BufferedReader(new InputStreamReader(is));
-        StringBuilder sb = new StringBuilder();
+    private String readAll(InputStream inputStream) throws Exception { //needed for the readLine
+        if (inputStream == null) return "";
+        BufferedReader input = new BufferedReader(new InputStreamReader(inputStream));
+        StringBuilder stringBuilder = new StringBuilder();
         String line;
-        while ((line = in.readLine()) != null) sb.append(line);
-        in.close();
-        return sb.toString();
+        while ((line = input.readLine()) != null) stringBuilder.append(line);
+        input.close();
+        return stringBuilder.toString();
     }
 
     private String safe(String s) {
+        //had problems with bad strings from API
         return s == null ? "" : s.trim();
     }
 
     private double[] boundingBox(double lat, double lon, double radiusKm) {
+        //cords calculation(rounded to 111)
+        //https://stackoverflow.com/questions/1253499/simple-calculations-for-working-with-lat-lon-and-km-distance
         double deltaLat = radiusKm / 111.0;
         double deltaLon = radiusKm / (111.0 * Math.cos(Math.toRadians(lat)));
         return new double[]{lat - deltaLat, lat + deltaLat, lon - deltaLon, lon + deltaLon};
-    }
-
-    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371.0;
-        double phi1 = Math.toRadians(lat1);
-        double phi2 = Math.toRadians(lat2);
-        double dPhi = Math.toRadians(lat2 - lat1);
-        double dLambda = Math.toRadians(lon2 - lon1);
-
-        double a = Math.sin(dPhi / 2) * Math.sin(dPhi / 2)
-                + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) * Math.sin(dLambda / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
     }
 
     public void setRadiusKm(double radiusKm) {

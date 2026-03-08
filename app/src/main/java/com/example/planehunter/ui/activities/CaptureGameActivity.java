@@ -29,8 +29,8 @@ public class CaptureGameActivity extends AppCompatActivity {
         ImageButton btnShutter = findViewById(R.id.btnShutter);
 
         // Optional: you can show callsign somewhere if you want later
-        String icao24 = getIntent().getStringExtra(EXTRA_ICAO24);
-        String callsign = getIntent().getStringExtra(EXTRA_CALLSIGN);
+        //String icao24 = getIntent().getStringExtra(EXTRA_ICAO24);
+        //String callsign = getIntent().getStringExtra(EXTRA_CALLSIGN);
 
         btnShutter.setOnClickListener(v -> onShutterPressed());
     }

@@ -21,6 +21,8 @@ import com.google.android.gms.location.LocationServices;
 
 import java.util.ArrayList;
 
+import com.example.planehunter.util.UtilMath;
+
 public class PlaneService extends Service {
 
     private static final String TAG = "PlaneServiceDebug";
@@ -51,8 +53,8 @@ public class PlaneService extends Service {
     private long pollIntervalMs = DEFAULT_POLL_INTERVAL_MS;
 
     // keep last known user location for UI/notification context
-    private double lastUserLat = Double.NaN;
-    private double lastUserLon = Double.NaN;
+    //private double lastUserLat = Double.NaN;
+    //private double lastUserLon = Double.NaN;
 
     private boolean isAppInForeground = false;
 
@@ -73,7 +75,6 @@ public class PlaneService extends Service {
         locationClient = LocationServices.getFusedLocationProviderClient(this);
 
         fetcher = new OpenSkyFetcher();
-        fetcher.setAppContext(this);
         fetcher.setRadiusKm(300);
 
         String id = getString(R.string.opensky_client_id);
@@ -106,7 +107,6 @@ public class PlaneService extends Service {
                 return START_STICKY;
             }
         }
-
         return START_STICKY;
     }
 
@@ -167,8 +167,8 @@ public class PlaneService extends Service {
                     double lat = location.getLatitude();
                     double lon = location.getLongitude();
 
-                    lastUserLat = lat;
-                    lastUserLon = lon;
+                    //lastUserLat = lat;
+                    //lastUserLon = lon;
 
                     fetchAndBroadcastAndUpdateFg(lat, lon);
                 })
@@ -237,7 +237,7 @@ public class PlaneService extends Service {
             double lon = p.getLon();
             if (Double.isNaN(lat) || Double.isNaN(lon)) continue;
 
-            double d = haversineKm(userLat, userLon, lat, lon);
+            double d = UtilMath.haversineMeters(userLat, userLon, lat, lon)/1000;//convert meters to KM
             if (d < minKm) minKm = d;
         }
 
@@ -252,17 +252,5 @@ public class PlaneService extends Service {
         return String.valueOf(Math.round(km));
     }
 
-    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371.0;
-        double phi1 = Math.toRadians(lat1);
-        double phi2 = Math.toRadians(lat2);
-        double dPhi = Math.toRadians(lat2 - lat1);
-        double dLambda = Math.toRadians(lon2 - lon1);
 
-        double a = Math.sin(dPhi / 2) * Math.sin(dPhi / 2)
-                + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) * Math.sin(dLambda / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
 }

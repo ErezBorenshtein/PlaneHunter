@@ -19,14 +19,12 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class CaptureGameView extends View {
 
-    // --- Config ---
+
     private static final float TARGET_SIZE_DP = 100f;
     private static final float PLANE_SIZE_DP  = 44f;
 
-    // Plane speed in px/sec
     private float speedPxPerSec = 650f;
 
-    // --- State ---
     private boolean running = false;
     private long lastFrameMs = 0;
 
@@ -39,13 +37,13 @@ public class CaptureGameView extends View {
 
     private final RectF targetRect = new RectF();
 
-    // --- Paints ---
+    //paints
     private final Paint paintBg = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintTarget = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    // --- Plane bitmap ---
     private Bitmap planeBmpOriginal;
     private Bitmap planeBmpScaled;
+
 
     public CaptureGameView(Context context) { super(context); init(); }
     public CaptureGameView(Context context, @Nullable AttributeSet attrs) { super(context, attrs); init(); }
@@ -53,25 +51,30 @@ public class CaptureGameView extends View {
 
     private void init() {
 
-        // Background
+        //background
         paintBg.setStyle(Paint.Style.FILL);
         paintBg.setColor(Color.rgb(5, 10, 20));
 
-        // Target box
+        //target
         paintTarget.setStyle(Paint.Style.STROKE);
-        paintTarget.setStrokeWidth(dp(3));
+        paintTarget.setStrokeWidth(3);
         paintTarget.setColor(Color.argb(220, 255, 255, 255));
 
-        // Load plane PNG from drawable (plane.png -> R.drawable.plane)
+        //laod plane image
         planeBmpOriginal = BitmapFactory.decodeResource(getResources(), R.drawable.air_plan);
-        planeBmpScaled = scaleToDp(planeBmpOriginal, PLANE_SIZE_DP);
+        planeBmpScaled = scaleToSize(planeBmpOriginal, PLANE_SIZE_DP);
     }
-
-    // ---------- Public API ----------
 
     public void startGame() {
         running = true;
         lastFrameMs = 0;
+
+        //needed so the game wont start unless there is a size for the view
+        if (getWidth() <= 0 || getHeight() <= 0) {
+            post(this::startGame);
+            return;
+        }
+
         resetRandomPassThroughTarget();
         postInvalidateOnAnimation();
     }
@@ -80,12 +83,10 @@ public class CaptureGameView extends View {
         running = false;
     }
 
-    // Returns true if the plane is inside the target at this moment
+    //checks if the plane is in the target
     public boolean tryCapture() {
         return RectF.intersects(targetRect, getPlaneRect());
     }
-
-    // ---------- Drawing + Update ----------
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -95,10 +96,9 @@ public class CaptureGameView extends View {
 
         if (running) updateMotionWrap();
 
-        // Draw target
-        canvas.drawRoundRect(targetRect, dp(10), dp(10), paintTarget);
+        //draw target
+        canvas.drawRoundRect(targetRect, 10,10, paintTarget);
 
-        // Draw plane bitmap
         drawPlane(canvas);
 
         if (running) postInvalidateOnAnimation();
@@ -120,7 +120,7 @@ public class CaptureGameView extends View {
 
         float half = getPlaneHalfSizePx();
 
-        // When fully out of bounds, start a new random pass from the right side
+        //start from the right side after it is out of bounds
         if (planeX + half < 0) {
             resetRandomPassThroughTarget();
         }
@@ -129,15 +129,16 @@ public class CaptureGameView extends View {
     private void drawPlane(Canvas canvas) {
 
         Bitmap bmp = planeBmpScaled;
-        if (bmp == null) return;
+
+        if (bmp == null)
+            return;
 
         float halfW = bmp.getWidth() / 2f;
         float halfH = bmp.getHeight() / 2f;
 
         canvas.save();
 
-        // Move to plane center, rotate, then draw bitmap centered
-        canvas.translate(planeX, planeY);
+        canvas.translate(planeX, planeY); //moves to the center of the plane
         canvas.rotate(planeAngleDeg);
         canvas.drawBitmap(bmp, -halfW, -halfH, null);
 
@@ -148,7 +149,7 @@ public class CaptureGameView extends View {
 
         Bitmap bmp = planeBmpScaled;
         if (bmp == null) {
-            float half = dp(PLANE_SIZE_DP) * 0.5f;
+            float half = PLANE_SIZE_DP * 0.5f;
             return new RectF(planeX - half, planeY - half, planeX + half, planeY + half);
         }
 
@@ -160,13 +161,11 @@ public class CaptureGameView extends View {
     private float getPlaneHalfSizePx() {
 
         Bitmap bmp = planeBmpScaled;
-        if (bmp == null) return dp(PLANE_SIZE_DP) * 0.5f;
+        if (bmp == null) return PLANE_SIZE_DP * 0.5f;
 
         // Use max dimension for safe "fully offscreen" checks
         return Math.max(bmp.getWidth(), bmp.getHeight()) / 2f;
     }
-
-    // ---------- Setup ----------
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
@@ -175,113 +174,73 @@ public class CaptureGameView extends View {
         rebuildTargetRect(w, h);
 
         // Rescale bitmap in case density/size changes and restart a clean pass
-        planeBmpScaled = scaleToDp(planeBmpOriginal, PLANE_SIZE_DP);
-        resetRandomPassThroughTarget();
+        //planeBmpScaled = scaleToDp(planeBmpOriginal, PLANE_SIZE_DP);
+        //resetRandomPassThroughTarget();
     }
 
     private void rebuildTargetRect(int w, int h) {
 
-        float size = dp(TARGET_SIZE_DP);
+        float size = TARGET_SIZE_DP;
         float cx = w / 2f;
         float cy = h / 2f;
 
         targetRect.set(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f);
     }
 
-    /**
-     * Starts a new pass from the right side.
-     * The Y is chosen so the plane will definitely pass through the target box.
-     */
-    private void resetRandomPassThroughTarget() {
 
-        if (getWidth() <= 0 || getHeight() <= 0) return;
+    private void resetRandomPassThroughTarget() {
 
         float half = getPlaneHalfSizePx();
 
-        float tx = targetRect.centerX();
-        float ty = targetRect.centerY();
+        float targetX = targetRect.centerX();
+        float targetY = targetRect.centerY();
 
-        // Start somewhere near the right edge (random X band) + random Y band (full height)
-        float startX = getWidth() + half;
-        float startY = randFloat(half, getHeight() - half);
+        //start at random plance on the right side
+        float startX = getWidth() + half; //out of screen
+        float startY = randFloat(0f, getHeight());
 
         // End somewhere near the left edge (random X band)
-        float endX = randFloat(-half - dp(120), -half);
+        float endX = randFloat(-half - 120, -half);
         float endY;
 
-        // Pick endY so that the line segment from start->end crosses the target center Y at X=tx.
-        // Line equation: y = startY + t*(endY-startY), where t = (tx-startX)/(endX-startX).
-        // We solve for endY: endY = startY + (ty-startY)/t
+        //the plane should go through the center of the screen
+        //line equation: y = startY + t*(endY-startY), where t = (tx-startX)/(endX-startX).
+        //we solve for endY: endY = startY + (ty-startY)/t
         float denom = (endX - startX);
 
-        // Avoid degenerate case (should not happen, but be safe)
-        if (Math.abs(denom) < 0.001f) {
-            endY = ty;
-        } else {
-            float t = (tx - startX) / denom;
+        float t = (targetX - startX) / denom;
 
-            // Ensure t is between 0..1 (target X is between start and end)
-            // If not (rare due to randomness), force a simple valid configuration
-            if (t <= 0.05f || t >= 0.95f) {
-                startX = getWidth() + half + dp(60);
-                endX = -half - dp(60);
-                t = (tx - startX) / (endX - startX);
-            }
+        endY = startY + (targetY - startY) / t;
 
-            endY = startY + (ty - startY) / t;
-        }
-
-        // Clamp endY to screen bounds. If clamp breaks the guarantee too much,
-        // regenerate with a better startY.
+        //ensure that plane doesn't get out of the screen
         endY = clamp(endY, half, getHeight() - half);
 
-        // Apply start as the current plane position
+        //set start cords
         planeX = startX;
         planeY = startY;
 
-        // Build velocity toward end with a constant speed
+        //calc distance for each axis
         float dx = endX - startX;
         float dy = endY - startY;
 
-        float len = (float) Math.sqrt(dx * dx + dy * dy);
-        if (len < 1f) len = 1f;
+        float len = (float) Math.sqrt(Math.pow(dx,2) + Math.pow(dy,2));
 
         velX = (dx / len) * speedPxPerSec;
         velY = (dy / len) * speedPxPerSec;
 
-        // Angle in degrees: bitmap points right at 0 degrees, so atan2(dy, dx) is perfect.
+        //calc angle in degrees
         planeAngleDeg = (float) Math.toDegrees(Math.atan2(dy, dx));
     }
 
-    /**
-     * Picks a Y so the plane's bounding box will intersect the target box during the pass.
-     * We choose within [targetTop+half .. targetBottom-half].
-     */
-    private float pickYThatCrossesTarget(float planeHalf) {
 
-        float top = targetRect.top + planeHalf;
-        float bottom = targetRect.bottom - planeHalf;
-
-        // Safety clamp in case the target is too large or the screen is too small
-        top = clamp(top, planeHalf, getHeight() - planeHalf);
-        bottom = clamp(bottom, planeHalf, getHeight() - planeHalf);
-
-        if (bottom <= top) {
-            return getHeight() / 2f;
-        }
-
-        return randFloat(top, bottom);
-    }
-
-    // ---------- Utils ----------
-
-    private Bitmap scaleToDp(Bitmap src, float targetDp) {
+    private Bitmap scaleToSize(Bitmap src, float targetDp) {
         if (src == null) return null;
-        int targetPx = Math.max(16, Math.round(dp(targetDp)));
+        int targetPx = Math.max(16, Math.round(targetDp));
         return Bitmap.createScaledBitmap(src, targetPx, targetPx, true);
     }
 
     private float randFloat(float a, float b) {
+        //https://stackoverflow.com/questions/40431966/what-is-the-best-way-to-generate-a-random-float-value-included-into-a-specified
         return (float) (ThreadLocalRandom.current().nextDouble(a, b));
     }
 
@@ -289,7 +248,4 @@ public class CaptureGameView extends View {
         return Math.max(lo, Math.min(hi, v));
     }
 
-    private float dp(float v) {
-        return v * getResources().getDisplayMetrics().density;
-    }
 }

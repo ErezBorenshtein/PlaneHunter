@@ -2,6 +2,7 @@ package com.example.planehunter.ui.dialogs;
 
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -30,17 +31,21 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 public class PlaneSheet extends BottomSheetDialogFragment {
 
-    // Listener used to notify the Activity when the user presses Capture
     public interface Listener {
         void onCapturePressed(@NonNull Plane plane);
     }
 
     private static final String ARG_ICAO = "icao";
     private static final String ARG_CALL = "call";
+    private static final String ARG_REG = "reg";
     private static final String ARG_LAT = "lat";
     private static final String ARG_LON = "lon";
     private static final String ARG_ALT = "alt";
@@ -49,10 +54,9 @@ public class PlaneSheet extends BottomSheetDialogFragment {
     private Plane plane;
     private Listener listener;
 
-    /**
-     * Creates a new instance of the sheet and stores the plane data in arguments.
-     * We pass primitive values instead of the object itself to avoid Serializable/Parcelable.
-     */
+    private static final Map<String, String> photoUrlCache = new HashMap<>();
+    private static final Set<String> noPhotoCache = new HashSet<>();
+
     public static PlaneSheet newInstance(@NonNull Plane plane) {
 
         PlaneSheet sheet = new PlaneSheet();
@@ -60,6 +64,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         Bundle args = new Bundle();
         args.putString(ARG_ICAO, plane.getIcao24());
         args.putString(ARG_CALL, plane.getCallSign());
+        args.putString(ARG_REG, plane.getRegistration());
         args.putDouble(ARG_LAT, plane.getLat());
         args.putDouble(ARG_LON, plane.getLon());
         args.putDouble(ARG_ALT, plane.getAltitude());
@@ -87,17 +92,14 @@ public class PlaneSheet extends BottomSheetDialogFragment {
 
         restorePlaneFromArgs();
 
-        loadPlanePhoto(imgPlane, progPlane);
-
-        TextView tvTitle = v.findViewById(R.id.tvTitle);
-        TextView tvSubtitle = v.findViewById(R.id.tvSubtitle);
+        TextView tvRegistration = v.findViewById(R.id.tvRegistration);
+        TextView tvTypeCode = v.findViewById(R.id.tvTypeCode);
         TextView tvAltitude = v.findViewById(R.id.tvAltitude);
         TextView tvHeading = v.findViewById(R.id.tvHeading);
-        TextView tvCoords = v.findViewById(R.id.tvCoords);
         Button btnCapture = v.findViewById(R.id.btnCapture);
 
-        bindHeader(tvTitle, tvSubtitle);
-        bindDetails(tvAltitude, tvHeading, tvCoords);
+        bindBasicDetails(tvRegistration, tvTypeCode, tvAltitude, tvHeading);
+        loadPlanePhoto(imgPlane, progPlane);
 
         btnCapture.setOnClickListener(view -> {
             if (listener != null && plane != null) {
@@ -109,9 +111,6 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         return v;
     }
 
-    /**
-     * Rebuilds a Plane object from the arguments bundle.
-     */
     private void restorePlaneFromArgs() {
 
         Bundle args = getArguments();
@@ -123,37 +122,34 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                 args.getDouble(ARG_LAT),
                 args.getDouble(ARG_LON),
                 args.getDouble(ARG_ALT),
+                args.getString(ARG_REG),
                 args.getDouble(ARG_TRACK)
         );
     }
 
-    /**
-     * Displays the main title and subtitle.
-     */
-    private void bindHeader(TextView title, TextView subtitle) {
+    private void bindBasicDetails(TextView registration,
+                                  TextView typeCode,
+                                  TextView altitude,
+                                  TextView heading) {
 
         if (plane == null) return;
 
-        String call = plane.getCallSign();
-        String icao = plane.getIcao24();
+        String reg = plane.getRegistration();
+        String type = plane.getTypeName();
 
-        if (call != null && !call.trim().isEmpty()) {
-            title.setText(call.trim());
+        if (reg != null && !reg.trim().isEmpty()) {
+            registration.setText("Registration: " + reg.trim());
         } else {
-            title.setText("Aircraft");
+            registration.setText("Registration: Loading...");
         }
 
-        subtitle.setText("ICAO24: " + icao);
-    }
+        if (type != null && !type.trim().isEmpty()) {
+            typeCode.setText("Type: " + type.trim());
+        } else {
+            typeCode.setText("Type: Loading...");
+        }
 
-    /**
-     * Displays altitude, heading and coordinates.
-     */
-    private void bindDetails(TextView alt, TextView heading, TextView coords) {
-
-        if (plane == null) return;
-
-        alt.setText(String.format(
+        altitude.setText(String.format(
                 Locale.US,
                 "Altitude: %.0f m",
                 plane.getAltitude()
@@ -168,13 +164,6 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                     plane.getTrackDeg()
             ));
         }
-
-        coords.setText(String.format(
-                Locale.US,
-                "Lat/Lon: %.5f , %.5f",
-                plane.getLat(),
-                plane.getLon()
-        ));
     }
 
     private void loadPlanePhoto(ImageView img, ProgressBar prog) {
@@ -184,6 +173,53 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         String icaoRaw = plane.getIcao24();
         if (icaoRaw == null || icaoRaw.trim().isEmpty()) {
             prog.setVisibility(View.GONE);
+            img.setImageResource(R.drawable.plane_placeholder);
+            return;
+        }
+
+        String icao = icaoRaw.trim().toUpperCase(Locale.US);
+
+        String cachedUrl = photoUrlCache.get(icao);
+        if (cachedUrl != null) {
+
+            prog.setVisibility(View.VISIBLE);
+
+            Glide.with(this)
+                    .load(cachedUrl)
+                    .placeholder(R.drawable.plane_placeholder)
+                    .error(R.drawable.plane_placeholder)
+                    .listener(new RequestListener<Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(
+                                @Nullable GlideException e,
+                                Object model,
+                                Target<Drawable> target,
+                                boolean isFirstResource) {
+
+                            prog.setVisibility(View.GONE);
+                            return false;
+                        }
+
+                        @Override
+                        public boolean onResourceReady(
+                                Drawable resource,
+                                Object model,
+                                Target<Drawable> target,
+                                DataSource dataSource,
+                                boolean isFirstResource) {
+
+                            prog.setVisibility(View.GONE);
+                            return false;
+                        }
+                    })
+                    .into(img);
+
+            return;
+        }
+
+        if (noPhotoCache.contains(icao)) {
+            prog.setVisibility(View.GONE);
+            img.setImageResource(R.drawable.plane_placeholder);
             return;
         }
 
@@ -194,16 +230,16 @@ public class PlaneSheet extends BottomSheetDialogFragment {
             HttpURLConnection conn = null;
 
             try {
-                String icao = icaoRaw.trim().toUpperCase(Locale.US);
-                String apiUrl = "https://skylinkapi.p.rapidapi.com/v3/photos/icao24/" + icao;
+                String apiUrl = "https://skylink-api.p.rapidapi.com/aircraft/icao24/" + icao + "?photos=true";
 
                 conn = (HttpURLConnection) new URL(apiUrl).openConnection();
                 conn.setConnectTimeout(8000);
                 conn.setReadTimeout(8000);
+                conn.setRequestMethod("GET");
 
                 String key = getString(R.string.skylink_key);
-                conn.setRequestProperty("X-RapidAPI-Key", key);
-                conn.setRequestProperty("X-RapidAPI-Host", "skylinkapi.p.rapidapi.com");
+                conn.setRequestProperty("x-rapidapi-key", key);
+                conn.setRequestProperty("x-rapidapi-host", "skylink-api.p.rapidapi.com");
 
                 int code = conn.getResponseCode();
 
@@ -213,19 +249,37 @@ public class PlaneSheet extends BottomSheetDialogFragment {
 
                 String body = readAll(is);
 
-                android.util.Log.d("PlaneSheet", "SkyLink code=" + code + " body=" + body);
+
+                Log.d("PlaneSheet", "SkyLink URL=" + apiUrl);
+                Log.d("PlaneSheet", "SkyLink code=" + code + " body=" + body);
+
+                updateAircraftInfoFromSkyLink(body);
 
                 if (code < 200 || code >= 300) {
-                    safeUi(() -> prog.setVisibility(View.GONE));
+                    safeUi(() -> {
+                        prog.setVisibility(View.GONE);
+                        img.setImageResource(R.drawable.plane_placeholder);
+                    });
                     return;
                 }
 
                 String photoUrl = extractFirstPhotoUrl(body);
 
+                Log.d("PlaneSheet", "Extracted photoUrl=" + photoUrl);
+
                 if (photoUrl == null || photoUrl.isEmpty()) {
-                    safeUi(() -> prog.setVisibility(View.GONE));
+
+                    noPhotoCache.add(icao);
+
+                    safeUi(() -> {
+                        prog.setVisibility(View.GONE);
+                        img.setImageResource(R.drawable.plane_placeholder);
+                    });
+
                     return;
                 }
+
+                photoUrlCache.put(icao, photoUrl);
 
                 safeUi(() ->
                         Glide.with(this)
@@ -234,14 +288,24 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                                 .error(R.drawable.plane_placeholder)
                                 .listener(new RequestListener<Drawable>() {
                                     @Override
-                                    public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                                        android.util.Log.e("PlaneSheet", "Glide failed: " + (e == null ? "null" : e.getMessage()));
+                                    public boolean onLoadFailed(
+                                            @Nullable GlideException e,
+                                            Object model,
+                                            Target<Drawable> target,
+                                            boolean isFirstResource) {
+
                                         prog.setVisibility(View.GONE);
                                         return false;
                                     }
 
                                     @Override
-                                    public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                                    public boolean onResourceReady(
+                                            Drawable resource,
+                                            Object model,
+                                            Target<Drawable> target,
+                                            DataSource dataSource,
+                                            boolean isFirstResource) {
+
                                         prog.setVisibility(View.GONE);
                                         return false;
                                     }
@@ -250,13 +314,60 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                 );
 
             } catch (Exception e) {
-                android.util.Log.e("PlaneSheet", "loadPlanePhoto exception", e);
-                safeUi(() -> prog.setVisibility(View.GONE));
+
+                Log.e("PlaneSheet", "loadPlanePhoto exception", e);
+
+                safeUi(() -> {
+                    prog.setVisibility(View.GONE);
+                    img.setImageResource(R.drawable.plane_placeholder);
+                });
+
             } finally {
                 if (conn != null) conn.disconnect();
             }
 
         }).start();
+    }
+
+    private void updateAircraftInfoFromSkyLink(String json) {
+        try {
+            JSONObject obj = new JSONObject(json);
+            JSONObject aircraft = obj.optJSONObject("aircraft");
+            if (aircraft == null) return;
+
+            String registration = aircraft.optString("registration", null);
+            String typeCode = aircraft.optString("icao_type", null);
+            String typeName = aircraft.optString("type_name", null);
+
+            safeUi(() -> {
+                if (!isAdded() || plane == null) return;
+
+                plane.setRegistration(registration);
+                plane.setTypeName(typeCode);
+                plane.setTypeName(typeName);
+
+                View root = getView();
+                if (root == null) return;
+
+                TextView tvRegistration = root.findViewById(R.id.tvRegistration);
+                TextView tvTypeCode = root.findViewById(R.id.tvTypeCode);
+
+                if (registration != null && !registration.trim().isEmpty()) {
+                    tvRegistration.setText("Registration: " + registration.trim());
+                } else {
+                    tvRegistration.setText("Registration: Unknown");
+                }
+
+                if (typeCode != null && !typeCode.trim().isEmpty()) {
+                    tvTypeCode.setText("Type: " + typeCode.trim());
+                } else {
+                    tvTypeCode.setText("Type: Unknown");
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e("PlaneSheet", "updateAircraftInfoFromSkyLink failed", e);
+        }
     }
 
     private String readAll(InputStream is) throws Exception {
@@ -272,27 +383,62 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         try {
             JSONObject obj = new JSONObject(json);
 
-            // לפעמים זה "photos", לפעמים משהו אחר – הלוג למעלה יגיד לנו.
+            Log.d("PlaneSheet", "Full JSON: " + obj.toString());
+
             JSONArray photos = obj.optJSONArray("photos");
-            if (photos == null || photos.length() == 0) return null;
+            if (photos != null && photos.length() > 0) {
+                String url = extractUrlFromPhotoObject(photos.optJSONObject(0));
+                if (url != null) return url;
+            }
 
-            JSONObject p0 = photos.optJSONObject(0);
-            if (p0 == null) return null;
+            JSONObject aircraft = obj.optJSONObject("aircraft");
+            if (aircraft != null) {
+                photos = aircraft.optJSONArray("photos");
+                if (photos != null && photos.length() > 0) {
+                    String url = extractUrlFromPhotoObject(photos.optJSONObject(0));
+                    if (url != null) return url;
+                }
+            }
 
-            // בדוק בלוג מה השם המדויק. נפוץ: "url" / "link" / "image"
-            String url = p0.optString("url", null);
-            if (url != null && !url.isEmpty()) return url;
+            JSONObject data = obj.optJSONObject("data");
+            if (data != null) {
+                photos = data.optJSONArray("photos");
+                if (photos != null && photos.length() > 0) {
+                    String url = extractUrlFromPhotoObject(photos.optJSONObject(0));
+                    if (url != null) return url;
+                }
 
-            url = p0.optString("link", null);
-            if (url != null && !url.isEmpty()) return url;
+                JSONObject aircraftInData = data.optJSONObject("aircraft");
+                if (aircraftInData != null) {
+                    photos = aircraftInData.optJSONArray("photos");
+                    if (photos != null && photos.length() > 0) {
+                        String url = extractUrlFromPhotoObject(photos.optJSONObject(0));
+                        if (url != null) return url;
+                    }
+                }
+            }
 
-            url = p0.optString("image", null);
-            return (url == null || url.isEmpty()) ? null : url;
+            return null;
 
         } catch (Exception e) {
-            android.util.Log.e("PlaneSheet", "extractFirstPhotoUrl failed", e);
+            Log.e("PlaneSheet", "extractFirstPhotoUrl failed", e);
             return null;
         }
+    }
+
+    private String extractUrlFromPhotoObject(JSONObject photoObj) {
+        if (photoObj == null) return null;
+
+        String url = photoObj.optString("image", null);
+        if (url != null && !url.isEmpty()) return url;
+
+        url = photoObj.optString("url", null);
+        if (url != null && !url.isEmpty()) return url;
+
+        url = photoObj.optString("link", null);
+        if (url != null && !url.isEmpty()) return url;
+
+        return null;
     }
 
     private void safeUi(Runnable r) {

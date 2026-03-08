@@ -13,7 +13,7 @@ import androidx.annotation.Nullable;
 
 import com.example.planehunter.model.Plane;
 import com.example.planehunter.R;
-import com.example.planehunter.util.RadarMath;
+import com.example.planehunter.util.UtilMath;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -218,10 +218,10 @@ public class RadarView extends View {
         for (Plane p : planes) {
             if (p == null) continue;
 
-            double distM = RadarMath.haversineMeters(userLat, userLon, p.getLat(), p.getLon());
+            double distM = UtilMath.haversineMeters(userLat, userLon, p.getLat(), p.getLon());
             if (distM > radarRangeMeters) continue;
 
-            double bearing = RadarMath.bearingDeg(userLat, userLon, p.getLat(), p.getLon());
+            double bearing = UtilMath.bearingDeg(userLat, userLon, p.getLat(), p.getLon());
 
             // bearing (0=N) -> canvas angle (0=+X): bearing - 90
             double ang = Math.toRadians(bearing - 90.0);

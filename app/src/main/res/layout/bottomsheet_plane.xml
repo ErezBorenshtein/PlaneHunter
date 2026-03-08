@@ -5,59 +5,65 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- Small top grabber bar -->
-
     <ImageView
         android:id="@+id/imgPlane"
         android:layout_width="match_parent"
-        android:layout_height="160dp"
-        android:scaleType="fitCenter"
+        android:layout_height="220dp"
         android:layout_marginBottom="12dp"
-        android:src="@drawable/plane_placeholder"/>
+        android:scaleType="fitCenter"
+        android:src="@drawable/plane_placeholder" />
 
     <ProgressBar
         android:id="@+id/progPlane"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:visibility="gone"/>
+        android:visibility="gone" />
+
     <View
         android:layout_width="40dp"
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
-        android:background="#33000000"
-        android:layout_marginBottom="12dp"/>
+        android:layout_marginBottom="12dp"
+        android:background="#33000000" />
 
     <TextView
-        android:id="@+id/tvTitle"
+        android:id="@+id/tvRegistration"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:text="Registration: Loading..."
         android:textSize="18sp"
-        android:textStyle="bold"/>
+        android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/tvSubtitle"
+        android:id="@+id/tvTypeCode"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"/>
+        android:layout_marginTop="4dp"
+        android:text="Type: Loading..." />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="12dp">
+        android:layout_marginTop="12dp"
+        android:orientation="vertical">
 
-        <TextView android:id="@+id/tvAltitude" android:layout_width="match_parent" android:layout_height="wrap_content"/>
-        <TextView android:id="@+id/tvHeading" android:layout_width="match_parent" android:layout_height="wrap_content"/>
-        <TextView android:id="@+id/tvCoords" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        <TextView
+            android:id="@+id/tvAltitude"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
 
+        <TextView
+            android:id="@+id/tvHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
     <Button
         android:id="@+id/btnCapture"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Capture"
-        android:layout_marginTop="16dp"/>
+        android:layout_marginTop="16dp"
+        android:text="Capture" />
 
 </LinearLayout>
