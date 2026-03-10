@@ -28,8 +28,8 @@ public class RadarView extends View {
         Plane plane;
         float x;
         float y;
-        float hitR;     // hit radius in px
-        float rotDeg;   // rotation degrees for drawing
+        float hitR; //hit radius in px
+        float rotDeg; //rotation degrees for drawing
     }
 
     private static final float ICON_HEADING_OFFSET_DEG = -90f; //the default heading is right(-90 degs)
@@ -45,11 +45,11 @@ public class RadarView extends View {
     private double userLat = 0.0;
     private double userLon = 0.0;
 
-    private double radarRangeMeters = 4000.0; // default 4km
+    private double radarRangeMeters = 30000.0; //default 30km
     private float meRadiusPx = 14f;
 
-    private Bitmap planeBmpOriginal;
-    private Bitmap planeBmpScaled;
+    private Bitmap planeOriginalBitmap;
+    private Bitmap planeScaledBitmap;
     private int planeIconSizePx = 56;
 
     private OnPlaneClickListener listener;
@@ -57,28 +57,35 @@ public class RadarView extends View {
     private Plane selectedPlane = null;
     private long pulseStartTime = 0;
 
-    public RadarView(Context context) { super(context); init(); }
-    public RadarView(Context context, @Nullable AttributeSet attrs) { super(context, attrs); init(); }
-    public RadarView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) { super(context, attrs, defStyleAttr); init(); }
+    public RadarView(Context context) {
+        super(context);
+        init();
+    }
+    public RadarView(Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+    public RadarView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init();
+    }
 
     private void init() {
         paintGrid.setStyle(Paint.Style.STROKE);
         paintGrid.setStrokeWidth(3f);
-        paintGrid.setARGB(255, 0, 180, 0);
+        paintGrid.setARGB(255, 0, 180, 0); //green
 
         paintMe.setStyle(Paint.Style.FILL);
-        paintMe.setARGB(255, 0, 255, 0);
+        paintMe.setARGB(255, 0, 255, 0); //green
 
-        // Selected-plane pulse ring (stroke only)
+
         paintPulse.setStyle(Paint.Style.STROKE);
         paintPulse.setStrokeWidth(4f);
-        paintPulse.setARGB(255, 255, 255, 0); // Yellow, alpha will be animated
+        paintPulse.setARGB(255, 255, 255, 0); //yellow with alpha changing later
 
-        planeBmpOriginal = BitmapFactory.decodeResource(getResources(), R.drawable.air_plan);
-        planeBmpScaled = scalePlaneBitmap(planeBmpOriginal, planeIconSizePx);
+        planeOriginalBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.air_plan);
+        planeScaledBitmap = scalePlaneBitmap(planeOriginalBitmap, planeIconSizePx);
     }
-
-    // -------- Public API --------
 
     public void setOnPlaneClickListener(OnPlaneClickListener l) {
         this.listener = l;
@@ -92,84 +99,80 @@ public class RadarView extends View {
     }
 
     public void setPlanes(ArrayList<Plane> planes) {
-        if (planes == null) planes = new ArrayList<>();
+        if (planes == null){
+            planes = new ArrayList<>();
+        }
+
         lastPlanes = new ArrayList<>(planes);
         rebuildBlips(planes);
         invalidate();
     }
 
     public void setRadarRangeMeters(double meters) {
-        this.radarRangeMeters = Math.max(100.0, meters);
+        this.radarRangeMeters = meters;
         rebuildBlips();
         invalidate();
     }
-
-    public void setPlaneIconSizePx(int px) {
-        this.planeIconSizePx = Math.max(16, px);
-        planeBmpScaled = scalePlaneBitmap(planeBmpOriginal, planeIconSizePx);
-        rebuildBlips();
-        invalidate();
-    }
-
-    // -------- Drawing --------
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        float w = getWidth();
-        float h = getHeight();
-        float cx = w / 2f;
-        float cy = h / 2f;
-        float radius = Math.min(w, h) * 0.45f;
+        float width = getWidth();
+        float height = getHeight();
+        float centerX = width / 2f;
+        float centerY = height / 2f;
+        float radius = Math.min(width, height) * 0.45f; //45% of the small side
 
-        // Radar rings
-        canvas.drawCircle(cx, cy, radius, paintGrid);
-        canvas.drawCircle(cx, cy, radius * 0.66f, paintGrid);
-        canvas.drawCircle(cx, cy, radius * 0.33f, paintGrid);
+        //radar rings
+        canvas.drawCircle(centerX, centerY, radius, paintGrid);
+        canvas.drawCircle(centerX, centerY, radius * 0.66f, paintGrid);
+        canvas.drawCircle(centerX, centerY, radius * 0.33f, paintGrid);
 
-        // Cross
-        canvas.drawLine(cx - radius, cy, cx + radius, cy, paintGrid);
-        canvas.drawLine(cx, cy - radius, cx, cy + radius, paintGrid);
+        //cross
+        canvas.drawLine(centerX - radius, centerY, centerX + radius, centerY, paintGrid);
+        canvas.drawLine(centerX, centerY - radius, centerX, centerY + radius, paintGrid);
 
-        // Me in center
-        canvas.drawCircle(cx, cy, meRadiusPx, paintMe);
+        //me in center
+        canvas.drawCircle(centerX, centerY, meRadiusPx, paintMe);
 
-        Bitmap bmp = planeBmpScaled;
-        if (bmp == null) return;
+        Bitmap bitmap = planeScaledBitmap;
+        if (bitmap == null) return;
 
-        float half = bmp.getWidth() / 2f;
+        float half = bitmap.getWidth() / 2f;
 
         synchronized (lock) {
-            for (Blip b : blips) {
+            for (Blip blip : blips) {
                 canvas.save();
-                canvas.translate(b.x, b.y);
-                canvas.rotate(b.rotDeg);
-                canvas.drawBitmap(bmp, -half, -half, null);
+                canvas.translate(blip.x, blip.y); //moves canvas center to plane center
+                canvas.rotate(blip.rotDeg);
+                canvas.drawBitmap(bitmap, -half, -half, null);
                 canvas.restore();
             }
             drawSelectedPlanePulse(canvas);
         }
     }
 
-    // -------- Touch --------
-
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() != MotionEvent.ACTION_DOWN) return true;
 
-        float tx = event.getX();
-        float ty = event.getY();
+        float touchX = event.getX();
+        float touchY = event.getY();
 
-        Plane hit = findHitPlane(tx, ty);
-        if (hit != null && listener != null) {
-            listener.onPlaneClicked(hit);
-        }
+        Plane hit = findHitPlane(touchX, touchY);
 
         if (hit == null) {
             setSelectedPlane(null); // clear selection
             return true;
         }
+
+        setSelectedPlane(hit);
+
+        if (listener != null) {
+            listener.onPlaneClicked(hit);
+        }
+
         return true;
     }
 
@@ -191,23 +194,24 @@ public class RadarView extends View {
         pulseStartTime = System.currentTimeMillis();
         invalidate();
     }
-
-    // -------- Blip building --------
+    
 
     private void rebuildBlips() {
+        //when user location, view size or radar radius changes
         rebuildBlips(lastPlanes);
     }
 
-    private void rebuildBlips(ArrayList<Plane> planes) {
-        float w = getWidth();
-        float h = getHeight();
-        if (w <= 0 || h <= 0) return;
+    private void rebuildBlips(ArrayList<Plane> planes) {//when there are new planes
 
-        float cx = w / 2f;
-        float cy = h / 2f;
-        float radiusPx = Math.min(w, h) * 0.45f;
+        float width = getWidth();
+        float height = getHeight();
+        if (width <= 0 || height <= 0) return; //if view wasn't initialized
 
-        // Can't position planes without user location
+        float cx = width / 2f;
+        float cy = height / 2f;
+        float radiusPx = Math.min(width, height) * 0.45f;
+
+        //cant position planes without user location
         if (userLat == 0.0 && userLon == 0.0) {
             synchronized (lock) { blips.clear(); }
             return;
@@ -215,20 +219,23 @@ public class RadarView extends View {
 
         ArrayList<Blip> newBlips = new ArrayList<>();
 
+        //doing it in because I need to write the blimps in synchronization
         for (Plane p : planes) {
             if (p == null) continue;
 
             double distM = UtilMath.haversineMeters(userLat, userLon, p.getLat(), p.getLon());
-            if (distM > radarRangeMeters) continue;
+            if (distM > radarRangeMeters) continue;//if outside of the radar radius
 
             double bearing = UtilMath.bearingDeg(userLat, userLon, p.getLat(), p.getLon());
 
-            // bearing (0=N) -> canvas angle (0=+X): bearing - 90
-            double ang = Math.toRadians(bearing - 90.0);
+            //bearing (0=N) -> canvas angle (0=+X): bearing - 90
+            double ang = Math.toRadians(bearing - 90.0); //in canvas 0->right so i do -90
 
+            //convert real dist to racial dist for the radar
             float r = (float) (distM / radarRangeMeters * radiusPx);
             float x = cx + (float) (Math.cos(ang) * r);
             float y = cy + (float) (Math.sin(ang) * r);
+
 
             Blip b = new Blip();
             b.plane = p;
@@ -243,13 +250,13 @@ public class RadarView extends View {
                 b.rotDeg = 0f; // unknown
             }
 
-            int iconSize = (planeBmpScaled != null) ? planeBmpScaled.getWidth() : planeIconSizePx;
-            b.hitR = Math.max(18f, iconSize * 0.65f);
+            int iconSize = (planeScaledBitmap != null) ? planeScaledBitmap.getWidth() : planeIconSizePx;
+            b.hitR = Math.max(18f, iconSize * 0.65f); //so icon wont be too small
 
             newBlips.add(b);
         }
 
-        synchronized (lock) {
+        synchronized (lock) { //move new blips to the blips list
             blips.clear();
             blips.addAll(newBlips);
         }
@@ -265,50 +272,39 @@ public class RadarView extends View {
 
         if (selectedPlane == null) return;
 
-        // Find the selected plane's current screen position from the built blips list.
-        // We do NOT recompute geometry here; we reuse the x/y already calculated in rebuildBlips().
-        Blip sb = null;
+        //find the selected plane's current screen position from blips list
+        Blip selectedBlip = null;
         synchronized (lock) {
             for (Blip b : blips) {
                 if (b == null || b.plane == null) continue;
 
-                // Reference match is usually enough because planes are from the same list object.
-                // Fallback: match by ICAO24 in case you rebuild Plane objects elsewhere.
                 if (b.plane == selectedPlane) {
-                    sb = b;
-                    break;
-                }
-                if (b.plane.getIcao24() != null && selectedPlane.getIcao24() != null
-                        && b.plane.getIcao24().equals(selectedPlane.getIcao24())) {
-                    sb = b;
+                    selectedBlip = b;
                     break;
                 }
             }
         }
 
-        if (sb == null) return;
+        if (selectedBlip == null) return;
 
         long now = System.currentTimeMillis();
         long t = now - pulseStartTime;
 
-        // Pulse period in ms (1.2 seconds). Phase goes 0..1.
-        final float periodMs = 1200f;
+        final float periodMs = 1200f; //pulse period in ms
         float phase = (t % (long) periodMs) / periodMs;
 
         // Animate radius and alpha: ring expands and fades out.
-        float baseR = Math.max(18f, sb.hitR);
-        float radius = baseR + phase * (baseR * 1.2f);   // grows to ~2.2x
+        float baseR = Math.max(18f, selectedBlip.hitR);
+        float radius = baseR + phase * (baseR * 1.2f);
         int alpha = (int) (255 * (1f - phase));
 
         paintPulse.setAlpha(alpha);
 
-        canvas.drawCircle(sb.x, sb.y, radius, paintPulse);
+        canvas.drawCircle(selectedBlip.x, selectedBlip.y, radius, paintPulse);
 
-        // Keep the animation running while a plane is selected.
+        //keep the animation running while plane is selected
         postInvalidateOnAnimation();
     }
-
-    // -------- Bitmap utils --------
 
     private Bitmap scalePlaneBitmap(Bitmap src, int targetPx) {
         if (src == null) return null;

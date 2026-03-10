@@ -1,6 +1,10 @@
 package com.example.planehunter.model;
 
-public class Plane {
+import android.os.Parcel;
+import android.os.Parcelable;
+
+public class Plane implements Parcelable { //so I can use it in the intent
+
     public String icao24;
     public String callSign;
     public double lat;
@@ -20,6 +24,9 @@ public class Plane {
         this.altitude = altitude;
         this.trackDeg = trackDeg;
         this.registration = null;
+        this.model = null;
+        this.manufacturerName = null;
+        this.typeName = null;
     }
 
     public Plane(String icao24, String callSign, double lat, double lon, double altitude, String registration, double trackDeg) {
@@ -35,7 +42,8 @@ public class Plane {
         this.typeName = null;
     }
 
-    public Plane(String icao24, String callSign, double lat, double lon, double altitude, String registration, String model, String manufacturerName, String typeCode, double trackDeg) {
+    public Plane(String icao24, String callSign, double lat, double lon, double altitude,
+                 String registration, String model, String manufacturerName, String typeCode, double trackDeg) {
         this.icao24 = icao24;
         this.callSign = callSign;
         this.lat = lat;
@@ -46,6 +54,50 @@ public class Plane {
         this.manufacturerName = manufacturerName;
         this.typeName = typeCode;
         this.trackDeg = trackDeg;
+    }
+
+    protected Plane(Parcel in) {
+        icao24 = in.readString();
+        callSign = in.readString();
+        lat = in.readDouble();
+        lon = in.readDouble();
+        altitude = in.readDouble();
+        registration = in.readString();
+        model = in.readString();
+        manufacturerName = in.readString();
+        typeName = in.readString();
+        trackDeg = in.readDouble();
+    }
+
+    public static final Creator<Plane> CREATOR = new Creator<Plane>() {
+        @Override
+        public Plane createFromParcel(Parcel in) {
+            return new Plane(in);
+        }
+
+        @Override
+        public Plane[] newArray(int size) {
+            return new Plane[size];
+        }
+    };
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeString(icao24);
+        dest.writeString(callSign);
+        dest.writeDouble(lat);
+        dest.writeDouble(lon);
+        dest.writeDouble(altitude);
+        dest.writeString(registration);
+        dest.writeString(model);
+        dest.writeString(manufacturerName);
+        dest.writeString(typeName);
+        dest.writeDouble(trackDeg);
     }
 
     public String getTypeName() {

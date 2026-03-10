@@ -31,7 +31,7 @@ public class OpenSkyFetcher {
         void onPlanesFetched(ArrayList<Plane> planes);
     }
 
-    private double radiusKm = 4.0;
+    private double radiusKm = 30.0;
 
     // OAuth client credentials
     private String clientId = null;

@@ -16,8 +16,6 @@ public class NotificationHelper {
 
     public static void ensureChannels(Context ctx) {
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
-
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 

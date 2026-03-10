@@ -28,19 +28,17 @@ public class PlaneService extends Service {
     private static final String TAG = "PlaneServiceDebug";
     private static final int FOREGROUND_ID = 1;
 
-    // --- actions to control service behavior ---
+
     public static final String ACTION_SET_POLL_INTERVAL = "com.example.planehunter.SET_POLL_INTERVAL";
     public static final String EXTRA_POLL_INTERVAL_MS = "poll_interval_ms";
 
     public static final String ACTION_SET_APP_FOREGROUND = "com.example.planehunter.SET_APP_FOREGROUND";
     public static final String EXTRA_APP_FOREGROUND = "app_foreground";
 
-    // Defaults
     private static final long DEFAULT_POLL_INTERVAL_MS = 60_000L;  // 1 minute
     private static final long MIN_POLL_INTERVAL_MS = 2_000L;       // safety clamp
     private static final long MAX_POLL_INTERVAL_MS = 5 * 60_000L;  // safety clamp
 
-    // Foreground notification updates (every 5 minutes)
     private static final long FOREGROUND_UPDATE_MS = 5 * 60_000L;
     private long lastForegroundUpdateMs = 0;
 
@@ -64,7 +62,7 @@ public class PlaneService extends Service {
 
         NotificationHelper.ensureChannels(this);
 
-        // Start foreground with a single ongoing notification
+        //start foreground with a single ongoing notification
         startForeground(
                 FOREGROUND_ID,
                 NotificationHelper.buildForegroundNotification(this,
@@ -72,17 +70,18 @@ public class PlaneService extends Service {
                         "Starting...")
         );
 
-        locationClient = LocationServices.getFusedLocationProviderClient(this);
+        locationClient = LocationServices.getFusedLocationProviderClient(this);//start location tracking
 
         fetcher = new OpenSkyFetcher();
-        fetcher.setRadiusKm(300);
+        fetcher.setRadiusKm(300); //!temporary for testing
 
         String id = getString(R.string.opensky_client_id);
         String secret = getString(R.string.opensky_client_secret);
         fetcher.setClientCredentials(id, secret);
 
+        //creates a loop with delay
         handler = new Handler(Looper.getMainLooper());
-        task = () -> {
+        task = () -> { //runable variable
             pollOnce();
             handler.postDelayed(task, pollIntervalMs);
         };
@@ -95,13 +94,13 @@ public class PlaneService extends Service {
 
         if (intent != null) {
 
-            if (ACTION_SET_APP_FOREGROUND.equals(intent.getAction())) {
+            if (ACTION_SET_APP_FOREGROUND.equals(intent.getAction())) { //update foreground message
                 isAppInForeground = intent.getBooleanExtra(EXTRA_APP_FOREGROUND, false);
                 Log.d(TAG, "App foreground = " + isAppInForeground);
                 return START_STICKY;
             }
 
-            if (ACTION_SET_POLL_INTERVAL.equals(intent.getAction())) {
+            if (ACTION_SET_POLL_INTERVAL.equals(intent.getAction())) { //update interval time
                 long ms = intent.getLongExtra(EXTRA_POLL_INTERVAL_MS, pollIntervalMs);
                 applyPollInterval(ms);
                 return START_STICKY;
@@ -112,29 +111,30 @@ public class PlaneService extends Service {
 
     @Override
     public void onDestroy() {
+        //stop service
         Log.d(TAG, "PlaneService destroyed");
 
         if (handler != null && task != null) {
             handler.removeCallbacks(task);
         }
 
-        stopForeground(true);
+        stopForeground(STOP_FOREGROUND_REMOVE);//stop and remove the notification;
 
         super.onDestroy();
     }
 
     @Override
-    public IBinder onBind(Intent intent) {
+    public IBinder onBind(Intent intent) {//not bounded service
         return null;
     }
 
     private void applyPollInterval(long requestedMs) {
-        long clamped = Math.max(MIN_POLL_INTERVAL_MS, Math.min(requestedMs, MAX_POLL_INTERVAL_MS));
-        pollIntervalMs = clamped;
+
+        pollIntervalMs = Math.max(MIN_POLL_INTERVAL_MS, Math.min(requestedMs, MAX_POLL_INTERVAL_MS));//for safety check if less than max
 
         if (handler != null && task != null) {
-            handler.removeCallbacks(task);
-            handler.post(task); // restart immediately with new cadence
+            handler.removeCallbacks(task);//stop the task
+            handler.post(task); //restart the task with new interval
         }
 
         Log.d(TAG, "Poll interval updated to " + pollIntervalMs + " ms");
@@ -147,7 +147,11 @@ public class PlaneService extends Service {
             return;
         }
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        //android studio wanted me to put this too
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) !=
+                        PackageManager.PERMISSION_GRANTED) {
             // TODO: Consider calling
             //    ActivityCompat#requestPermissions
             // here to request the missing permissions, and then overriding
@@ -157,6 +161,7 @@ public class PlaneService extends Service {
             // for ActivityCompat#requestPermissions for more details.
             return;
         }
+
         locationClient.getLastLocation()
                 .addOnSuccessListener(location -> {
                     if (location == null) {
@@ -170,7 +175,7 @@ public class PlaneService extends Service {
                     //lastUserLat = lat;
                     //lastUserLon = lon;
 
-                    fetchAndBroadcastAndUpdateFg(lat, lon);
+                    fetchBroadcastAndUpdateFg(lat, lon);
                 })
                 .addOnFailureListener(e -> Log.e(TAG, "Failed to get location", e));
     }
@@ -180,30 +185,32 @@ public class PlaneService extends Service {
                 || ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void fetchAndBroadcastAndUpdateFg(double lat, double lon) {
+    private void fetchBroadcastAndUpdateFg(double lat, double lon) {
 
         fetcher.fetchPlanes(lat, lon, planesFound -> {
 
-            // Broadcast to app (Radar UI)
-            Intent i = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);
-            i.setPackage(getPackageName());
-            sendBroadcast(i);
+            //broadcast data to app (to the UI)
+            Intent intent = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);
+            intent.setPackage(getPackageName());
+            sendBroadcast(intent);
 
             Log.d(TAG, "Broadcast sent. planes=" + (planesFound == null ? 0 : planesFound.size()));
 
-            // Update *ONLY* the foreground notification every 5 minutes
-            maybeUpdateForegroundNotification(lat, lon, planesFound);
+            //update the foreground notification every 5 minutes
+            long now = System.currentTimeMillis();
+            if (now - lastForegroundUpdateMs < FOREGROUND_UPDATE_MS) {
+                return;
+            }
+
+            lastForegroundUpdateMs = now;
+            updateForeground(lat, lon, planesFound);
         });
     }
 
-    private void maybeUpdateForegroundNotification(double userLat, double userLon, ArrayList<Plane> planesFound) {
-
-        long now = System.currentTimeMillis();
-        if (now - lastForegroundUpdateMs < FOREGROUND_UPDATE_MS) return;
-        lastForegroundUpdateMs = now;
+    private void updateForeground(double userLat, double userLon, ArrayList<Plane> planesFound) {
 
         int count = (planesFound == null) ? 0 : planesFound.size();
-        double closestKm = findClosestDistanceKm(userLat, userLon, planesFound);
+        double closestKm = findClosestPlaneDistance(userLat, userLon, planesFound);
 
         String title = "✈ PlaneHunter";
         String text;
@@ -218,20 +225,20 @@ public class PlaneService extends Service {
             text = count + " planes in " + radius + "km • closest: " + formatKm(closestKm) + " km";
         }
 
-        // Update the SAME foreground notification (same ID)
+        //update the foreground notification (same ID)
         startForeground(
                 FOREGROUND_ID,
                 NotificationHelper.buildForegroundNotification(this, title, text)
         );
     }
 
-    private double findClosestDistanceKm(double userLat, double userLon, ArrayList<Plane> planesFound) {
+    private double findClosestPlaneDistance(double userLat, double userLon, ArrayList<Plane> planesFound) {
         if (planesFound == null || planesFound.isEmpty()) return Double.NaN;
 
-        double minKm = Double.POSITIVE_INFINITY;
+        double minKm = fetcher.getRadiusKm(); //closest plane can be maximum in radius
 
-        for (Plane p : planesFound) {
-            if (p == null) continue;
+        for (Plane p : planesFound) { //go over each plane and calc distance
+            if (p == null) continue; //for safety
 
             double lat = p.getLat();
             double lon = p.getLon();
@@ -241,10 +248,11 @@ public class PlaneService extends Service {
             if (d < minKm) minKm = d;
         }
 
-        return (minKm == Double.POSITIVE_INFINITY) ? Double.NaN : minKm;
+        return (minKm == fetcher.getRadiusKm()) ? Double.NaN : minKm; //NaN if not in radius else minKm
     }
 
     private String formatKm(double km) {
+        //if under 10->in decimal else->round number
         if (Double.isNaN(km)) return "?";
         if (km < 10.0) {
             return String.format(java.util.Locale.US, "%.1f", km);

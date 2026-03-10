@@ -33,6 +33,7 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "PlaneHunterDebug";
+    private static final int REQUEST_CAPTURE_GAME = 2001;
 
     private RadarView radarView;
     private Button btnStart;
@@ -40,19 +41,19 @@ public class MainActivity extends AppCompatActivity {
     private Button btnLogout;
 
     private boolean isLoggingOut = false;
+    private boolean isReceiverRegistered = false;
 
     private final BroadcastReceiver planesReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            if (intent == null) return;
             if (!PlaneBroadcast.ACTION_PLANES_UPDATED.equals(intent.getAction())) return;
 
             Log.d(TAG, "planes update received");
 
-            String planesJson = intent.getStringExtra(PlaneBroadcast.EXTRA_PLANES_JSON);
-            double userLat = intent.getDoubleExtra(PlaneBroadcast.EXTRA_USER_LAT, 0.0);
-            double userLon = intent.getDoubleExtra(PlaneBroadcast.EXTRA_USER_LON, 0.0);
-
-            ArrayList<Plane> planes = PlaneBroadcast.planesFromJson(planesJson);
+            double userLat = PlaneBroadcast.getUserLat(intent);
+            double userLon = PlaneBroadcast.getUserLon(intent);
+            ArrayList<Plane> planes = PlaneBroadcast.getPlanes(intent);
 
             Log.d(TAG, "planes=" + planes.size());
 
@@ -77,9 +78,11 @@ public class MainActivity extends AppCompatActivity {
     private final ActivityResultLauncher<String> backgroundLocationLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
                 if (!granted) {
-                    Toast.makeText(this,
+                    Toast.makeText(
+                            this,
                             "Background location not granted (service may not update in background)",
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_LONG
+                    ).show();
                 }
             });
 
@@ -104,28 +107,23 @@ public class MainActivity extends AppCompatActivity {
 
         radarView.setOnPlaneClickListener(plane -> {
             radarView.setSelectedPlane(plane);
-            PlaneSheet sheet = PlaneSheet.newInstance(plane);
 
+            PlaneSheet sheet = PlaneSheet.newInstance(plane);
             sheet.setListener(p -> {
                 Intent i = new Intent(this, CaptureGameActivity.class);
                 i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
                 i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
-                startActivityForResult(i, 2001);
-                // This will later connect to the XP / capture system
-                // capturePlane(p);
+                startActivityForResult(i, REQUEST_CAPTURE_GAME);
             });
 
             sheet.show(getSupportFragmentManager(), "plane_sheet");
-
         });
 
         btnStart.setOnClickListener(v -> {
             ensurePermissions();
             if (!hasAllRequiredPermissions()) return;
 
-            // Ask background (if needed) before starting the service
             requestBackgroundLocationIfNeeded();
-
             startPlaneService();
         });
 
@@ -135,7 +133,6 @@ public class MainActivity extends AppCompatActivity {
             isLoggingOut = true;
 
             FirebaseHandler.getInstance().signOut();
-
             stopPlaneService();
 
             Intent i = new Intent(this, LogIn.class);
@@ -144,21 +141,19 @@ public class MainActivity extends AppCompatActivity {
             finish();
         });
 
-        //! temporary
-        radarView.setRadarRangeMeters(300_000.0); // 300km
-        //radarView.setRadarRangeMeters(100_000.0); // 100km
+        // Temporary
+        radarView.setRadarRangeMeters(300_000.0); // 300 km
+        // radarView.setRadarRangeMeters(100_000.0); // 100 km
     }
 
     @Override
     protected void onStart() {
         super.onStart();
 
-        IntentFilter f = new IntentFilter(PlaneBroadcast.ACTION_PLANES_UPDATED);
-        registerReceiver(planesReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+        registerPlanesReceiver();
 
-        //setServicePollInterval(3_000L); // update every 3 seconds when app is opened
+        // setServicePollInterval(3_000L); // update every 3 seconds when app is opened
         setServicePollInterval(25_000L); // update every 25 seconds when app is opened
-
         setAppForegroundState(true);
     }
 
@@ -179,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == 2001 && resultCode == RESULT_OK && data != null) {
+        if (requestCode == REQUEST_CAPTURE_GAME && resultCode == RESULT_OK && data != null) {
             boolean hit = data.getBooleanExtra(CaptureGameActivity.RESULT_HIT, false);
             if (hit) {
                 // TODO: give XP + save capture to Firebase
@@ -187,15 +182,36 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void registerPlanesReceiver() {
+        if (isReceiverRegistered) return;
+
+        IntentFilter filter = new IntentFilter(PlaneBroadcast.ACTION_PLANES_UPDATED);
+
+        registerReceiver(planesReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+
+        isReceiverRegistered = true;
+    }
+
     private void unregisterReceiverSafe() {
+        if (!isReceiverRegistered) return;
+
         try {
             unregisterReceiver(planesReceiver);
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.w(TAG, "Receiver was not registered or already unregistered", e);
+        }
+
+        isReceiverRegistered = false;
     }
 
     private void startPlaneService() {
         Intent i = new Intent(this, PlaneService.class);
-        startForegroundService(i);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.startForegroundService(this, i);
+        } else {
+            startService(i);
+        }
     }
 
     private void stopPlaneService() {
@@ -205,7 +221,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void ensurePermissions() {
         if (hasAllRequiredPermissions()) {
-            // If we already have required foreground permissions, we can still request background (if needed)
             requestBackgroundLocationIfNeeded();
             return;
         }
@@ -219,23 +234,24 @@ public class MainActivity extends AppCompatActivity {
                         || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
 
         boolean hasNotif = true;
-        if (Build.VERSION.SDK_INT >= 33) {
-            hasNotif = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasNotif = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    == PackageManager.PERMISSION_GRANTED;
         }
 
         return hasLoc && hasNotif;
     }
 
     private boolean hasBackgroundLocationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true; // No background permission pre-Android 10
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true;
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestBackgroundLocationIfNeeded() {
-        // Must request separately AFTER foreground location is granted
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return; // Android 9 and below
-        if (!hasForegroundLocationPermission()) return;            // don’t ask background before foreground
+        // Must request separately after foreground location is granted
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+        if (!hasForegroundLocationPermission()) return;
         if (hasBackgroundLocationPermission()) return;
 
         backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
@@ -248,15 +264,16 @@ public class MainActivity extends AppCompatActivity {
 
     @NonNull
     private String[] buildRequiredPermissionsArray() {
-        // IMPORTANT: do NOT include ACCESS_BACKGROUND_LOCATION here.
+        // Do not include ACCESS_BACKGROUND_LOCATION here.
         // Android will only offer "While using the app" if you request background together with foreground.
-        if (Build.VERSION.SDK_INT >= 33) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             return new String[]{
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                     Manifest.permission.POST_NOTIFICATIONS
             };
         }
+
         return new String[]{
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION
