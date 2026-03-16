@@ -4,10 +4,15 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import androidx.annotation.Nullable;
 
@@ -32,12 +37,15 @@ public class RadarView extends View {
         float rotDeg; //rotation degrees for drawing
     }
 
-    private static final float ICON_HEADING_OFFSET_DEG = -90f; //the default heading is right(-90 degs)
+    private static final float ICON_HEADING_OFFSET = -90f; //the default heading is right(-90 degs)
 
     private final Paint paintGrid = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintMe = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintPulse = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paintPlaneNormal = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paintPlaneCooldown = new Paint(Paint.ANTI_ALIAS_FLAG);
 
+    private final Set<String> cooldownIcaos = new HashSet<>();
     private final Object lock = new Object();
     private final List<Blip> blips = new ArrayList<>();
     private ArrayList<Plane> lastPlanes = new ArrayList<>();
@@ -73,7 +81,7 @@ public class RadarView extends View {
     private void init() {
         paintGrid.setStyle(Paint.Style.STROKE);
         paintGrid.setStrokeWidth(3f);
-        paintGrid.setARGB(255, 0, 180, 0); //green
+        paintGrid.setARGB(255, 0, 180, 0); //lighter green
 
         paintMe.setStyle(Paint.Style.FILL);
         paintMe.setARGB(255, 0, 255, 0); //green
@@ -82,6 +90,13 @@ public class RadarView extends View {
         paintPulse.setStyle(Paint.Style.STROKE);
         paintPulse.setStrokeWidth(4f);
         paintPulse.setARGB(255, 255, 255, 0); //yellow with alpha changing later
+
+        //for converting plane to gray
+        ColorMatrix matrix = new ColorMatrix();
+        matrix.setSaturation(0f);
+
+        paintPlaneCooldown.setColorFilter(new ColorMatrixColorFilter(matrix));
+        paintPlaneCooldown.setAlpha(120);
 
         planeOriginalBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.air_plan);
         planeScaledBitmap = scalePlaneBitmap(planeOriginalBitmap, planeIconSizePx);
@@ -99,13 +114,61 @@ public class RadarView extends View {
     }
 
     public void setPlanes(ArrayList<Plane> planes) {
-        if (planes == null){
+        //need to marge planes that already have data
+
+        if (planes == null) {
             planes = new ArrayList<>();
         }
 
-        lastPlanes = new ArrayList<>(planes);
-        rebuildBlips(planes);
+        ArrayList<Plane> mergedPlanes = new ArrayList<>();
+
+        for (Plane newPlane : planes) {
+            if (newPlane == null) continue;
+
+            Plane oldPlane = findPlaneByIcao24(lastPlanes, newPlane.getIcao24());
+
+            if (oldPlane != null) {
+                if (isBlank(newPlane.getRegistration()) && !isBlank(oldPlane.getRegistration())) {
+                    newPlane.setRegistration(oldPlane.getRegistration());
+                }
+
+                if (isBlank(newPlane.getModel()) && !isBlank(oldPlane.getModel())) {
+                    newPlane.setModel(oldPlane.getModel());
+                }
+
+                if (isBlank(newPlane.getManufacturerName()) && !isBlank(oldPlane.getManufacturerName())) {
+                    newPlane.setManufacturerName(oldPlane.getManufacturerName());
+                }
+
+                if (isBlank(newPlane.getTypeName()) && !isBlank(oldPlane.getTypeName())) {
+                    newPlane.setTypeName(oldPlane.getTypeName());
+                }
+            }
+
+            mergedPlanes.add(newPlane);
+        }
+
+        lastPlanes = new ArrayList<>(mergedPlanes);
+        rebuildBlips(mergedPlanes);
         invalidate();
+    }
+
+    private Plane findPlaneByIcao24(ArrayList<Plane> planes, String icao24) {
+        if (planes == null || icao24 == null) return null;
+
+        for (Plane p : planes) {
+            if (p == null || p.getIcao24() == null) continue;
+
+            if (icao24.equalsIgnoreCase(p.getIcao24())) {
+                return p;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 
     public void setRadarRangeMeters(double meters) {
@@ -146,7 +209,14 @@ public class RadarView extends View {
                 canvas.save();
                 canvas.translate(blip.x, blip.y); //moves canvas center to plane center
                 canvas.rotate(blip.rotDeg);
-                canvas.drawBitmap(bitmap, -half, -half, null);
+
+                //if plane in cooldown-> gray else-> regular(yellow)
+                Paint planePaint = isPlaneInCooldown(blip.plane)
+                        ? paintPlaneCooldown
+                        : paintPlaneNormal;
+
+                canvas.drawBitmap(bitmap, -half, -half, planePaint);
+
                 canvas.restore();
             }
             drawSelectedPlanePulse(canvas);
@@ -193,6 +263,28 @@ public class RadarView extends View {
         selectedPlane = plane;
         pulseStartTime = System.currentTimeMillis();
         invalidate();
+    }
+
+    @Nullable
+    private String normalizeIcao(@Nullable String icao24) {
+        //to ensure all the ICAO's in the same format
+        if (icao24 == null) return null;
+
+        String trimmed = icao24.trim();
+        if (trimmed.isEmpty()) return null;
+
+        return trimmed.toUpperCase();
+    }
+
+    private boolean isPlaneInCooldown(@Nullable Plane plane) {
+        if (plane == null) return false;
+
+        String normalized = normalizeIcao(plane.getIcao24());
+        if (normalized == null) return false;
+
+        synchronized (lock) {
+            return cooldownIcaos.contains(normalized);
+        }
     }
     
 
@@ -245,7 +337,7 @@ public class RadarView extends View {
             // rotation by trackDeg (0=N) mapped to canvas, plus PNG heading offset
             double track = p.getTrackDeg();
             if (!Double.isNaN(track)) {
-                b.rotDeg = (float) track + ICON_HEADING_OFFSET_DEG;
+                b.rotDeg = (float) track + ICON_HEADING_OFFSET;
             } else {
                 b.rotDeg = 0f; // unknown
             }
@@ -304,6 +396,37 @@ public class RadarView extends View {
 
         //keep the animation running while plane is selected
         postInvalidateOnAnimation();
+    }
+
+    public void setCooldownIcaos(Set<String> icaos) {
+        synchronized (lock) {
+            cooldownIcaos.clear();
+
+            if (icaos == null) {
+                invalidate();
+                return;
+            }
+
+            for (String icao : icaos) {
+                String normalized = normalizeIcao(icao);
+                if (normalized != null) {
+                    cooldownIcaos.add(normalized);
+                }
+            }
+        }
+
+        invalidate();
+    }
+
+    public void addCooldownIcao(String icao24) {
+        String normalized = normalizeIcao(icao24);
+        if (normalized == null) return;
+
+        synchronized (lock) {
+            cooldownIcaos.add(normalized);
+        }
+
+        invalidate();
     }
 
     private Bitmap scalePlaneBitmap(Bitmap src, int targetPx) {

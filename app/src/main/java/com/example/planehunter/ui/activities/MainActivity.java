@@ -36,12 +36,12 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CAPTURE_GAME = 2001;
 
     private RadarView radarView;
-    private Button btnStart;
-    private Button btnStop;
     private Button btnLogout;
 
     private boolean isLoggingOut = false;
     private boolean isReceiverRegistered = false;
+
+    private Plane pendingCapturePlane;
 
     private final BroadcastReceiver planesReceiver = new BroadcastReceiver() {
         @Override
@@ -101,8 +101,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         radarView = findViewById(R.id.radarView);
-        btnStart = findViewById(R.id.btnStart);
-        btnStop = findViewById(R.id.btnStop);
         btnLogout = findViewById(R.id.btnLogout);
 
         radarView.setOnPlaneClickListener(plane -> {
@@ -110,6 +108,8 @@ public class MainActivity extends AppCompatActivity {
 
             PlaneSheet sheet = PlaneSheet.newInstance(plane);
             sheet.setListener(p -> {
+                pendingCapturePlane = p;
+
                 Intent i = new Intent(this, CaptureGameActivity.class);
                 i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
                 i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
@@ -118,16 +118,6 @@ public class MainActivity extends AppCompatActivity {
 
             sheet.show(getSupportFragmentManager(), "plane_sheet");
         });
-
-        btnStart.setOnClickListener(v -> {
-            ensurePermissions();
-            if (!hasAllRequiredPermissions()) return;
-
-            requestBackgroundLocationIfNeeded();
-            startPlaneService();
-        });
-
-        btnStop.setOnClickListener(v -> stopPlaneService());
 
         btnLogout.setOnClickListener(view -> {
             isLoggingOut = true;
@@ -151,10 +141,12 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
 
         registerPlanesReceiver();
+        loadCooldownPlanes();
 
         // setServicePollInterval(3_000L); // update every 3 seconds when app is opened
         setServicePollInterval(25_000L); // update every 25 seconds when app is opened
         setAppForegroundState(true);
+
     }
 
     @Override
@@ -174,12 +166,58 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == REQUEST_CAPTURE_GAME && resultCode == RESULT_OK && data != null) {
-            boolean hit = data.getBooleanExtra(CaptureGameActivity.RESULT_HIT, false);
-            if (hit) {
-                // TODO: give XP + save capture to Firebase
-            }
+        if (requestCode != REQUEST_CAPTURE_GAME || resultCode != RESULT_OK || data == null) {
+            return;
         }
+
+        boolean hit = data.getBooleanExtra(CaptureGameActivity.RESULT_HIT, false);
+        if (!hit) {
+            return;
+        }
+
+        if (pendingCapturePlane == null) {
+            Toast.makeText(this, "Capture succeeded but plane data is missing", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        FirebaseHandler.getInstance()
+                .awardCaptureXp(pendingCapturePlane)
+                .addOnSuccessListener(result -> {
+                    if (result.cooldownActive) {
+                        long minutesLeft = Math.max(1L, (result.cooldownRemainingMs + 59999L) / 60000L);
+                        Toast.makeText(
+                                this,
+                                "You already captured this plane recently. Try again in about " + minutesLeft + " min",
+                                Toast.LENGTH_LONG
+                        ).show();
+                        return;
+                    }
+
+                    if (!result.awarded) {
+                        Toast.makeText(this, "No XP awarded", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    radarView.addCooldownIcao(pendingCapturePlane.getIcao24());//add plane to cooldwon list
+
+                    String msg = result.firstTime
+                            ? "New plane! +" + result.xpAwarded + " XP"
+                            : "Captured again! +" + result.xpAwarded + " XP";
+
+                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                })
+                .addOnFailureListener(e -> Toast.makeText(
+                        this,
+                        "Failed to award XP: " + e.getMessage(),
+                        Toast.LENGTH_LONG
+                ).show());
+    }
+
+    private void loadCooldownPlanes() {
+        FirebaseHandler.getInstance()
+                .getMyPlanesInCooldown()
+                .addOnSuccessListener(cooldownIcaos -> radarView.setCooldownIcaos(cooldownIcaos))
+                .addOnFailureListener(e -> Log.w(TAG, "Failed to load cooldown planes", e));
     }
 
     private void registerPlanesReceiver() {
@@ -202,16 +240,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         isReceiverRegistered = false;
-    }
-
-    private void startPlaneService() {
-        Intent i = new Intent(this, PlaneService.class);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ContextCompat.startForegroundService(this, i);
-        } else {
-            startService(i);
-        }
     }
 
     private void stopPlaneService() {

@@ -43,33 +43,25 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         void onCapturePressed(@NonNull Plane plane);
     }
 
-    private static final String ARG_ICAO = "icao";
-    private static final String ARG_CALL = "call";
-    private static final String ARG_REG = "reg";
-    private static final String ARG_LAT = "lat";
-    private static final String ARG_LON = "lon";
-    private static final String ARG_ALT = "alt";
-    private static final String ARG_TRACK = "track";
+    private static final String ARG_PLANE = "plane";
 
     private Plane plane;
     private Listener listener;
 
+    //cashes to save API calls
     private static final Map<String, String> photoUrlCache = new HashMap<>();
     private static final Set<String> noPhotoCache = new HashSet<>();
+    private static final Map<String, String> registrationCache = new HashMap<>();
+    private static final Map<String, String> typeCodeCache = new HashMap<>();
+
+    private boolean isLoadingAircraftInfo = false;
 
     public static PlaneSheet newInstance(@NonNull Plane plane) {
 
         PlaneSheet sheet = new PlaneSheet();
 
         Bundle args = new Bundle();
-        args.putString(ARG_ICAO, plane.getIcao24());
-        args.putString(ARG_CALL, plane.getCallSign());
-        args.putString(ARG_REG, plane.getRegistration());
-        args.putDouble(ARG_LAT, plane.getLat());
-        args.putDouble(ARG_LON, plane.getLon());
-        args.putDouble(ARG_ALT, plane.getAltitude());
-        args.putDouble(ARG_TRACK, plane.getTrackDeg());
-
+        args.putParcelable(ARG_PLANE, plane);
         sheet.setArguments(args);
         return sheet;
     }
@@ -91,6 +83,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         ProgressBar progPlane = v.findViewById(R.id.progPlane);
 
         restorePlaneFromArgs();
+        isLoadingAircraftInfo = shouldLoadAircraftInfo();
 
         TextView tvRegistration = v.findViewById(R.id.tvRegistration);
         TextView tvTypeCode = v.findViewById(R.id.tvTypeCode);
@@ -111,20 +104,43 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         return v;
     }
 
-    private void restorePlaneFromArgs() {
+    private void refreshAircraftTextViews() {
+        View root = getView();
+        if (root == null) return;
 
+        bindBasicDetails(
+                root.findViewById(R.id.tvRegistration),
+                root.findViewById(R.id.tvTypeCode),
+                root.findViewById(R.id.tvAltitude),
+                root.findViewById(R.id.tvHeading)
+        );
+    }
+
+    private boolean shouldLoadAircraftInfo() {
+        if (plane == null) return false;
+
+        return isBlank(plane.getRegistration()) || isBlank(plane.getTypeCode());
+    }
+
+    private void restorePlaneFromArgs() {
         Bundle args = getArguments();
         if (args == null) return;
 
-        plane = new Plane(
-                args.getString(ARG_ICAO),
-                args.getString(ARG_CALL),
-                args.getDouble(ARG_LAT),
-                args.getDouble(ARG_LON),
-                args.getDouble(ARG_ALT),
-                args.getString(ARG_REG),
-                args.getDouble(ARG_TRACK)
-        );
+        plane = args.getParcelable(ARG_PLANE);
+        if (plane == null) return;
+
+        String icao = normalizeIcao(plane.getIcao24());
+        if (icao == null) return;
+
+        String cachedRegistration = registrationCache.get(icao);
+        if (isBlank(plane.getRegistration()) && !isBlank(cachedRegistration)) {
+            plane.setRegistration(cachedRegistration);
+        }
+
+        String cachedTypeCode = typeCodeCache.get(icao);
+        if (isBlank(plane.getTypeCode()) && !isBlank(cachedTypeCode)) {
+            plane.setTypeCode(cachedTypeCode);
+        }
     }
 
     private void bindBasicDetails(TextView registration,
@@ -135,18 +151,22 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         if (plane == null) return;
 
         String reg = plane.getRegistration();
-        String type = plane.getTypeName();
+        String type = plane.getTypeCode();
 
-        if (reg != null && !reg.trim().isEmpty()) {
+        if (!isBlank(reg)) {
             registration.setText("Registration: " + reg.trim());
-        } else {
+        } else if (isLoadingAircraftInfo) {
             registration.setText("Registration: Loading...");
+        } else {
+            registration.setText("Registration: Unknown");
         }
 
-        if (type != null && !type.trim().isEmpty()) {
+        if (!isBlank(type)) {
             typeCode.setText("Type: " + type.trim());
-        } else {
+        } else if (isLoadingAircraftInfo) {
             typeCode.setText("Type: Loading...");
+        } else {
+            typeCode.setText("Type: Unknown");
         }
 
         altitude.setText(String.format(
@@ -170,14 +190,22 @@ public class PlaneSheet extends BottomSheetDialogFragment {
 
         if (plane == null) return;
 
+        isLoadingAircraftInfo = shouldLoadAircraftInfo();
+
         String icaoRaw = plane.getIcao24();
         if (icaoRaw == null || icaoRaw.trim().isEmpty()) {
+            isLoadingAircraftInfo = false;
             prog.setVisibility(View.GONE);
             img.setImageResource(R.drawable.plane_placeholder);
             return;
         }
 
         String icao = icaoRaw.trim().toUpperCase(Locale.US);
+
+        //if no registration and no TypeCode
+        if (!isBlank(plane.getRegistration()) || !isBlank(plane.getTypeCode())) {
+            isLoadingAircraftInfo = false;
+        }
 
         String cachedUrl = photoUrlCache.get(icao);
         if (cachedUrl != null) {
@@ -257,10 +285,21 @@ public class PlaneSheet extends BottomSheetDialogFragment {
 
                 if (code < 200 || code >= 300) {
                     safeUi(() -> {
+                        isLoadingAircraftInfo = false;
                         prog.setVisibility(View.GONE);
                         img.setImageResource(R.drawable.plane_placeholder);
+
+                        View root = getView();
+                        if (root != null) {
+                            bindBasicDetails(
+                                    root.findViewById(R.id.tvRegistration),
+                                    root.findViewById(R.id.tvTypeCode),
+                                    root.findViewById(R.id.tvAltitude),
+                                    root.findViewById(R.id.tvHeading)
+                            );
+                        }
+                        refreshAircraftTextViews();
                     });
-                    return;
                 }
 
                 String photoUrl = extractFirstPhotoUrl(body);
@@ -274,6 +313,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                     safeUi(() -> {
                         prog.setVisibility(View.GONE);
                         img.setImageResource(R.drawable.plane_placeholder);
+                        refreshAircraftTextViews();
                     });
 
                     return;
@@ -320,6 +360,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                 safeUi(() -> {
                     prog.setVisibility(View.GONE);
                     img.setImageResource(R.drawable.plane_placeholder);
+                    refreshAircraftTextViews();
                 });
 
             } finally {
@@ -333,40 +374,78 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         try {
             JSONObject obj = new JSONObject(json);
             JSONObject aircraft = obj.optJSONObject("aircraft");
-            if (aircraft == null) return;
 
-            String registration = aircraft.optString("registration", null);
-            String typeCode = aircraft.optString("icao_type", null);
-            String typeName = aircraft.optString("type_name", null);
+            String registration = null;
+            String typeCode = null;
+            String typeName = null;
+            String model = null;
+            String manufacturerName = null;
+
+            if (aircraft != null) {
+                registration = aircraft.optString("registration", null);
+                typeCode = aircraft.optString("icao_type", null);
+                typeName = aircraft.optString("type_name", null);
+                model = aircraft.optString("model", null);
+                manufacturerName = aircraft.optString("manufacturer", null);
+
+                if (isBlank(manufacturerName)) {
+                    manufacturerName = aircraft.optString("manufacturer_name", null);
+                }
+            }
+
+            String icao = normalizeIcao(plane != null ? plane.getIcao24() : null);
+
+            if (icao != null) {
+                if (!isBlank(registration)) {
+                    registrationCache.put(icao, registration.trim());
+                }
+
+                if (!isBlank(typeCode)) {
+                    typeCodeCache.put(icao, typeCode.trim());
+                }
+            }
+
+            String finalRegistration = registration;
+            String finalTypeCode = typeCode;
+            String finalTypeName = typeName;
+            String finalModel = model;
+            String finalManufacturerName = manufacturerName;
 
             safeUi(() -> {
                 if (!isAdded() || plane == null) return;
 
-                plane.setRegistration(registration);
-                plane.setTypeName(typeCode);
-                plane.setTypeName(typeName);
+                isLoadingAircraftInfo = false;
 
-                View root = getView();
-                if (root == null) return;
-
-                TextView tvRegistration = root.findViewById(R.id.tvRegistration);
-                TextView tvTypeCode = root.findViewById(R.id.tvTypeCode);
-
-                if (registration != null && !registration.trim().isEmpty()) {
-                    tvRegistration.setText("Registration: " + registration.trim());
-                } else {
-                    tvRegistration.setText("Registration: Unknown");
+                if (!isBlank(finalRegistration)) {
+                    plane.setRegistration(finalRegistration.trim());
                 }
 
-                if (typeCode != null && !typeCode.trim().isEmpty()) {
-                    tvTypeCode.setText("Type: " + typeCode.trim());
-                } else {
-                    tvTypeCode.setText("Type: Unknown");
+                if (!isBlank(finalTypeCode)) {
+                    plane.setTypeCode(finalTypeCode.trim());
                 }
+
+                if (!isBlank(finalTypeName)) {
+                    plane.setTypeName(finalTypeName.trim());
+                }
+
+                if (!isBlank(finalModel)) {
+                    plane.setModel(finalModel.trim());
+                }
+
+                if (!isBlank(finalManufacturerName)) {
+                    plane.setManufacturerName(finalManufacturerName.trim());
+                }
+
+                refreshAircraftTextViews();
             });
 
         } catch (Exception e) {
             Log.e("PlaneSheet", "updateAircraftInfoFromSkyLink failed", e);
+
+            safeUi(() -> {
+                isLoadingAircraftInfo = false;
+                refreshAircraftTextViews();
+            });
         }
     }
 
@@ -439,6 +518,20 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         if (url != null && !url.isEmpty()) return url;
 
         return null;
+    }
+
+    @Nullable
+    private String normalizeIcao(@Nullable String icao24) {
+        if (icao24 == null) return null;
+
+        String trimmed = icao24.trim();
+        if (trimmed.isEmpty()) return null;
+
+        return trimmed.toUpperCase(Locale.US);
+    }
+
+    private boolean isBlank(@Nullable String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private void safeUi(Runnable r) {

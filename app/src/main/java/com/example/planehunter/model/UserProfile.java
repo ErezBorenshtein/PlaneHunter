@@ -6,6 +6,7 @@ public class UserProfile {
 
     public long xp;
     public long caughtCount;
+    public long uniqueRegistrationsCount;
 
     public boolean notifyEnabled;
     public int radiusKm;
@@ -13,14 +14,16 @@ public class UserProfile {
     public long createdAtMs;
     public long updatedAtMs;
 
-    public UserProfile() { }
+    public UserProfile() {
+    }
 
     public UserProfile(String uid, String displayName) {
         this.uid = uid;
         this.displayName = displayName;
 
-        this.xp = 0;
-        this.caughtCount = 0;
+        this.xp = 0L;
+        this.caughtCount = 0L;
+        this.uniqueRegistrationsCount = 0L;
 
         this.notifyEnabled = true;
         this.radiusKm = 4;

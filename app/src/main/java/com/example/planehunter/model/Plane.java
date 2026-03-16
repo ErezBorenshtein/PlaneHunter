@@ -13,6 +13,7 @@ public class Plane implements Parcelable { //so I can use it in the intent
     public String registration;
     public String model;
     public String manufacturerName;
+    public String typeCode;
     public String typeName;
     public double trackDeg = Double.NaN;
 
@@ -43,7 +44,7 @@ public class Plane implements Parcelable { //so I can use it in the intent
     }
 
     public Plane(String icao24, String callSign, double lat, double lon, double altitude,
-                 String registration, String model, String manufacturerName, String typeCode, double trackDeg) {
+                 String registration, String model, String manufacturerName, String typeCode, double trackDeg, String typeName) {
         this.icao24 = icao24;
         this.callSign = callSign;
         this.lat = lat;
@@ -52,7 +53,8 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.registration = registration;
         this.model = model;
         this.manufacturerName = manufacturerName;
-        this.typeName = typeCode;
+        this.typeCode = typeCode;
+        this.typeName = typeName;
         this.trackDeg = trackDeg;
     }
 
@@ -65,6 +67,7 @@ public class Plane implements Parcelable { //so I can use it in the intent
         registration = in.readString();
         model = in.readString();
         manufacturerName = in.readString();
+        typeCode = in.readString();
         typeName = in.readString();
         trackDeg = in.readDouble();
     }
@@ -96,6 +99,7 @@ public class Plane implements Parcelable { //so I can use it in the intent
         dest.writeString(registration);
         dest.writeString(model);
         dest.writeString(manufacturerName);
+        dest.writeString(typeCode);
         dest.writeString(typeName);
         dest.writeDouble(trackDeg);
     }
@@ -152,7 +156,16 @@ public class Plane implements Parcelable { //so I can use it in the intent
         return registration;
     }
 
+    public String getTypeCode() {
+        return typeCode;
+    }
+
+    public void setTypeCode(String typeCode) {
+        this.typeCode = typeCode;
+    }
+
     public void setRegistration(String registration) {
         this.registration = registration;
     }
+
 }
