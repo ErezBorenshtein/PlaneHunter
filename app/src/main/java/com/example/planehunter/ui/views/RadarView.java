@@ -132,14 +132,6 @@ public class RadarView extends View {
                     newPlane.setRegistration(oldPlane.getRegistration());
                 }
 
-                if (isBlank(newPlane.getModel()) && !isBlank(oldPlane.getModel())) {
-                    newPlane.setModel(oldPlane.getModel());
-                }
-
-                if (isBlank(newPlane.getManufacturerName()) && !isBlank(oldPlane.getManufacturerName())) {
-                    newPlane.setManufacturerName(oldPlane.getManufacturerName());
-                }
-
                 if (isBlank(newPlane.getTypeName()) && !isBlank(oldPlane.getTypeName())) {
                     newPlane.setTypeName(oldPlane.getTypeName());
                 }

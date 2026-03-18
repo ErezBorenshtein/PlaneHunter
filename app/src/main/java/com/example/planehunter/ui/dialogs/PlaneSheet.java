@@ -86,12 +86,12 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         isLoadingAircraftInfo = shouldLoadAircraftInfo();
 
         TextView tvRegistration = v.findViewById(R.id.tvRegistration);
-        TextView tvTypeCode = v.findViewById(R.id.tvTypeCode);
+        TextView tvTypeName = v.findViewById(R.id.tvTypeName);
         TextView tvAltitude = v.findViewById(R.id.tvAltitude);
         TextView tvHeading = v.findViewById(R.id.tvHeading);
         Button btnCapture = v.findViewById(R.id.btnCapture);
 
-        bindBasicDetails(tvRegistration, tvTypeCode, tvAltitude, tvHeading);
+        bindBasicDetails(tvRegistration, tvTypeName, tvAltitude, tvHeading);
         loadPlanePhoto(imgPlane, progPlane);
 
         btnCapture.setOnClickListener(view -> {
@@ -110,7 +110,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
 
         bindBasicDetails(
                 root.findViewById(R.id.tvRegistration),
-                root.findViewById(R.id.tvTypeCode),
+                root.findViewById(R.id.tvTypeName),
                 root.findViewById(R.id.tvAltitude),
                 root.findViewById(R.id.tvHeading)
         );
@@ -119,7 +119,9 @@ public class PlaneSheet extends BottomSheetDialogFragment {
     private boolean shouldLoadAircraftInfo() {
         if (plane == null) return false;
 
-        return isBlank(plane.getRegistration()) || isBlank(plane.getTypeCode());
+        return isBlank(plane.getRegistration())
+                || isBlank(plane.getTypeCode())
+                || isBlank(plane.getTypeName());
     }
 
     private void restorePlaneFromArgs() {
@@ -144,14 +146,14 @@ public class PlaneSheet extends BottomSheetDialogFragment {
     }
 
     private void bindBasicDetails(TextView registration,
-                                  TextView typeCode,
+                                  TextView typeName,
                                   TextView altitude,
                                   TextView heading) {
 
         if (plane == null) return;
 
         String reg = plane.getRegistration();
-        String type = plane.getTypeCode();
+        String name = plane.getTypeName();
 
         if (!isBlank(reg)) {
             registration.setText("Registration: " + reg.trim());
@@ -161,18 +163,18 @@ public class PlaneSheet extends BottomSheetDialogFragment {
             registration.setText("Registration: Unknown");
         }
 
-        if (!isBlank(type)) {
-            typeCode.setText("Type: " + type.trim());
+        if (!isBlank(name)) {
+            typeName.setText("Aircraft: " + name.trim());
         } else if (isLoadingAircraftInfo) {
-            typeCode.setText("Type: Loading...");
+            typeName.setText("Aircraft: Loading...");
         } else {
-            typeCode.setText("Type: Unknown");
+            typeName.setText("Aircraft: Unknown");
         }
 
         altitude.setText(String.format(
                 Locale.US,
-                "Altitude: %.0f m",
-                plane.getAltitude()
+                "Altitude: %.0f ft",
+                plane.getAltitude()* 3.28084//convert to feet
         ));
 
         if (Double.isNaN(plane.getTrackDeg())) {
@@ -216,7 +218,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                     .load(cachedUrl)
                     .placeholder(R.drawable.plane_placeholder)
                     .error(R.drawable.plane_placeholder)
-                    .listener(new RequestListener<Drawable>() {
+                    .listener(new RequestListener<>() {
                         @Override
                         public boolean onLoadFailed(
                                 @Nullable GlideException e,
@@ -293,7 +295,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                         if (root != null) {
                             bindBasicDetails(
                                     root.findViewById(R.id.tvRegistration),
-                                    root.findViewById(R.id.tvTypeCode),
+                                    root.findViewById(R.id.tvTypeName),
                                     root.findViewById(R.id.tvAltitude),
                                     root.findViewById(R.id.tvHeading)
                             );
@@ -326,7 +328,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                                 .load(photoUrl)
                                 .placeholder(R.drawable.plane_placeholder)
                                 .error(R.drawable.plane_placeholder)
-                                .listener(new RequestListener<Drawable>() {
+                                .listener(new RequestListener<>() {
                                     @Override
                                     public boolean onLoadFailed(
                                             @Nullable GlideException e,
@@ -378,19 +380,11 @@ public class PlaneSheet extends BottomSheetDialogFragment {
             String registration = null;
             String typeCode = null;
             String typeName = null;
-            String model = null;
-            String manufacturerName = null;
 
             if (aircraft != null) {
                 registration = aircraft.optString("registration", null);
                 typeCode = aircraft.optString("icao_type", null);
                 typeName = aircraft.optString("type_name", null);
-                model = aircraft.optString("model", null);
-                manufacturerName = aircraft.optString("manufacturer", null);
-
-                if (isBlank(manufacturerName)) {
-                    manufacturerName = aircraft.optString("manufacturer_name", null);
-                }
             }
 
             String icao = normalizeIcao(plane != null ? plane.getIcao24() : null);
@@ -408,8 +402,9 @@ public class PlaneSheet extends BottomSheetDialogFragment {
             String finalRegistration = registration;
             String finalTypeCode = typeCode;
             String finalTypeName = typeName;
-            String finalModel = model;
-            String finalManufacturerName = manufacturerName;
+
+            Log.d("PlaneSheet", "TypeCode=" + String.valueOf(finalTypeCode));
+            Log.d("PlaneSheet", "TypeName=" + String.valueOf(finalTypeName));
 
             safeUi(() -> {
                 if (!isAdded() || plane == null) return;
@@ -426,14 +421,6 @@ public class PlaneSheet extends BottomSheetDialogFragment {
 
                 if (!isBlank(finalTypeName)) {
                     plane.setTypeName(finalTypeName.trim());
-                }
-
-                if (!isBlank(finalModel)) {
-                    plane.setModel(finalModel.trim());
-                }
-
-                if (!isBlank(finalManufacturerName)) {
-                    plane.setManufacturerName(finalManufacturerName.trim());
                 }
 
                 refreshAircraftTextViews();

@@ -37,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
     private RadarView radarView;
     private Button btnLogout;
+    private Button btnLeaderBoard;
 
     private boolean isLoggingOut = false;
     private boolean isReceiverRegistered = false;
@@ -102,6 +103,7 @@ public class MainActivity extends AppCompatActivity {
 
         radarView = findViewById(R.id.radarView);
         btnLogout = findViewById(R.id.btnLogout);
+        btnLeaderBoard = findViewById(R.id.btnLeaderboard);
 
         radarView.setOnPlaneClickListener(plane -> {
             radarView.setSelectedPlane(plane);
@@ -129,6 +131,11 @@ public class MainActivity extends AppCompatActivity {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(i);
             finish();
+        });
+
+        btnLeaderBoard.setOnClickListener(view -> {
+            Intent intent = new Intent(MainActivity.this, LeaderboardActivity.class);
+            startActivity(intent);
         });
 
         // Temporary

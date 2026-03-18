@@ -6,6 +6,8 @@ import androidx.annotation.Nullable;
 import com.example.planehunter.model.Plane;
 import com.example.planehunter.model.PlaneCapture;
 import com.example.planehunter.model.UserProfile;
+import com.example.planehunter.model.LeaderboardEntry;
+
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.auth.AuthResult;
@@ -19,6 +21,8 @@ import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.SetOptions;
+
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
 import java.util.Locale;
@@ -74,6 +78,12 @@ public class FirebaseHandler {
 
     public interface ProfileListener {
         void onProfile(@Nullable UserProfile profile);
+        void onError(@NonNull Exception e);
+    }
+
+    //to show the rank
+    public interface MyRankListener {
+        void onSuccess(@NonNull LeaderboardEntry entry, long rank);
         void onError(@NonNull Exception e);
     }
 
@@ -223,7 +233,8 @@ public class FirebaseHandler {
 
             transaction.set(userRef, profile, SetOptions.merge());
             transaction.set(captureRef, capture, SetOptions.merge());
-            transaction.set(leaderboardRef, buildLeaderboardEntry(profile.displayName, profile.xp, now), SetOptions.merge());
+            transaction.set(leaderboardRef, buildLeaderboardEntry(profile.uid ,profile.displayName, profile.xp,profile.caughtCount),
+                    SetOptions.merge());
 
             result.awarded = true;
             result.firstTime = firstTime;
@@ -235,8 +246,57 @@ public class FirebaseHandler {
         });
     }
 
+    @Nullable
+    public LeaderboardEntry toLeaderboardEntry(@NonNull DocumentSnapshot doc) {
+        //convert DocumentSnapshot to LeaderboardEntry
+
+        LeaderboardEntry entry = doc.toObject(LeaderboardEntry.class);
+
+        if (entry == null) {
+            return null;
+        }
+
+        if (entry.name == null || entry.name.trim().isEmpty()) {
+            entry.name = "Player";
+        }
+
+        return entry;
+    }
+
+
+    public void getMyLeaderboardRank(@NotNull MyRankListener listener){
+        String uid = getUidOrThrow();
+
+        myLeaderboardDoc().get()
+                .addOnSuccessListener(doc->{
+                   if(!doc.exists()){
+                       listener.onError(new IllegalStateException("User is not on leaderboard"));
+                   }
+
+                   LeaderboardEntry entry = doc.toObject(LeaderboardEntry.class);
+                   if(entry ==null){
+                       listener.onError(new IllegalStateException("Failed to parse leaderboard entry"));
+                       return;
+                   }
+
+                   long xp = doc.getLong("xp") !=null ? doc.getLong("xp") :0;
+
+                   db.collection("leaderboard").whereGreaterThan("xp",xp)
+                           .get()
+                           .addOnSuccessListener(aboveQuery->{
+                               long rank = aboveQuery.size() +1L;
+                               listener.onSuccess(entry,rank);
+                           })
+                           .addOnFailureListener(listener::onError);
+                })
+                .addOnFailureListener(listener::onError);
+
+    }
+
+
+
     public Task<Set<String>> getMyPlanesInCooldown() {
-        //for showing the captured planes in gray
+        //for showing the planes in cooldown in gray
         long now = System.currentTimeMillis();
 
         return myUserDoc()
@@ -307,52 +367,44 @@ public class FirebaseHandler {
             return new PlaneCapture(
                     emptyToNull(plane.getRegistration()),
                     emptyToNull(plane.getIcao24()),
+                    emptyToNull(plane.getTypeCode()),
                     emptyToNull(plane.getTypeName()),
-                    emptyToNull(plane.getModel()),
-                    emptyToNull(plane.getManufacturerName()),
                     emptyToNull(plane.getCallSign()),
-                    plane.getLat(),
-                    plane.getLon(),
-                    plane.getAltitude(),
                     now
             );
         }
 
         PlaneCapture capture = existingCaptureSnap.toObject(PlaneCapture.class);
         if (capture == null) {
-            capture = new PlaneCapture(
+            return new PlaneCapture(
                     emptyToNull(plane.getRegistration()),
                     emptyToNull(plane.getIcao24()),
+                    emptyToNull(plane.getTypeCode()),
                     emptyToNull(plane.getTypeName()),
-                    emptyToNull(plane.getModel()),
-                    emptyToNull(plane.getManufacturerName()),
                     emptyToNull(plane.getCallSign()),
-                    plane.getLat(),
-                    plane.getLon(),
-                    plane.getAltitude(),
                     now
             );
         }
 
         capture.registration = preferNonEmpty(capture.registration, plane.getRegistration());
         capture.icao24 = preferNonEmpty(capture.icao24, plane.getIcao24());
+        capture.typeCode = preferNonEmpty(capture.typeCode, plane.getTypeCode());
         capture.typeName = preferNonEmpty(capture.typeName, plane.getTypeName());
-        capture.model = preferNonEmpty(capture.model, plane.getModel());
-        capture.manufacturerName = preferNonEmpty(capture.manufacturerName, plane.getManufacturerName());
         capture.callSign = preferNonEmpty(capture.callSign, plane.getCallSign());
 
         if (capture.firstCaughtAtMs <= 0L) {
             capture.firstCaughtAtMs = now;
         }
 
+        capture.lastCaughtAtMs = now;
+        capture.timesCaught = Math.max(1L, capture.timesCaught + 1L);
+
         return capture;
     }
 
-    private LeaderboardEntry buildLeaderboardEntry(@NonNull String displayName, long xp, long now) {
-        LeaderboardEntry entry = new LeaderboardEntry();
-        entry.displayName = displayName;
-        entry.xp = xp;
-        entry.updatedAtMs = now;
+    private LeaderboardEntry buildLeaderboardEntry(@NonNull String uid,@NonNull String name, long xp, long captures) {
+        LeaderboardEntry entry = new LeaderboardEntry(uid,name,xp,captures);
+
         return entry;
     }
 
@@ -377,23 +429,17 @@ public class FirebaseHandler {
     }
 
     private long resolveBaseXp(@NonNull Plane plane) {
+        String typeCode = normalizeForMatch(plane.getTypeCode());
         String typeName = normalizeForMatch(plane.getTypeName());
-        String model = normalizeForMatch(plane.getModel());
-        String manufacturer = normalizeForMatch(plane.getManufacturerName());
 
-        Long byType = resolveXpByTypeName(typeName);
-        if (byType != null) {
-            return byType;
+        Long byTypeCode = resolveXpByTypeCode(typeCode);
+        if (byTypeCode != null) {
+            return byTypeCode;
         }
 
-        Long byModel = resolveXpByModel(model);
-        if (byModel != null) {
-            return byModel;
-        }
-
-        Long byManufacturer = resolveXpByManufacturer(manufacturer);
-        if (byManufacturer != null) {
-            return byManufacturer;
+        Long byTypeName = resolveXpByTypeName(typeName);
+        if (byTypeName != null) {
+            return byTypeName;
         }
 
         return XP_TIER_1;
@@ -405,48 +451,23 @@ public class FirebaseHandler {
             return null;
         }
 
-        if (startsWithAny(typeName, "A388")) return XP_TIER_5;
-        if (startsWithAny(typeName, "AN12", "AN22", "AN24", "AN72", "AN124", "AN225")) return XP_TIER_5;
-        if (startsWithAny(typeName, "C130", "C17", "C5", "E3", "A400")) return XP_TIER_5;
-
-        if (startsWithAny(typeName, "B77", "A35", "B744", "B748", "B74")) return XP_TIER_4;
-
-        if (startsWithAny(typeName, "B78", "B76", "A33", "A34")) return XP_TIER_3;
-
-        if (startsWithAny(typeName, "A319", "A220", "E190", "E195", "AT72", "AT75", "CRJ", "DH8")) {
-            return XP_TIER_2;
-        }
-
-        if (startsWithAny(typeName, "A320", "A321", "B737", "B738", "B739", "B73")) {
-            return XP_TIER_1;
-        }
-
-        return null;
-    }
-
-    @Nullable
-    private Long resolveXpByModel(@NonNull String model) {
-        if (model.isEmpty()) {
-            return null;
-        }
-
-        if (containsAny(model, "A380", "ANTONOV", "AN-124", "AN-225", "HELICOPTER", "GULFSTREAM", "FALCON", "LEARJET", "CHALLENGER")) {
+        if (containsAny(typeName, "A380", "ANTONOV", "AN-124", "AN-225", "C-130", "C-17", "C-5", "A400")) {
             return XP_TIER_5;
         }
 
-        if (containsAny(model, "777", "A350", "747", "FREIGHTER", "CARGO")) {
+        if (containsAny(typeName, "777", "A350", "747")) {
             return XP_TIER_4;
         }
 
-        if (containsAny(model, "787", "767", "A330", "A340")) {
+        if (containsAny(typeName, "787", "767", "A330", "A340")) {
             return XP_TIER_3;
         }
 
-        if (containsAny(model, "A319", "A220", "E190", "E195", "EMBRAER", "ATR", "CRJ", "DASH 8", "Q400")) {
+        if (containsAny(typeName, "A319", "A220", "E190", "E195", "EMBRAER", "ATR", "CRJ", "DASH 8", "Q400")) {
             return XP_TIER_2;
         }
 
-        if (containsAny(model, "A320", "A321", "737")) {
+        if (containsAny(typeName, "A320", "A321", "737")) {
             return XP_TIER_1;
         }
 
@@ -454,20 +475,24 @@ public class FirebaseHandler {
     }
 
     @Nullable
-    private Long resolveXpByManufacturer(@NonNull String manufacturer) {
-        if (manufacturer.isEmpty()) {
+    private Long resolveXpByTypeCode(@NonNull String typeCode) {
+        if (typeCode.isEmpty()) {
             return null;
         }
 
-        if (containsAny(manufacturer, "GULFSTREAM", "DASSAULT", "LEARJET")) {
-            return XP_TIER_5;
-        }
+        if (startsWithAny(typeCode, "A388")) return XP_TIER_5;
+        if (startsWithAny(typeCode, "AN12", "AN22", "AN24", "AN72", "AN124", "AN225")) return XP_TIER_5;
+        if (startsWithAny(typeCode, "C130", "C17", "C5", "E3", "A400")) return XP_TIER_5;
 
-        if (containsAny(manufacturer, "EMBRAER", "ATR", "BOMBARDIER", "DE HAVILLAND")) {
+        if (startsWithAny(typeCode, "B77", "A35", "B744", "B748", "B74")) return XP_TIER_4;
+
+        if (startsWithAny(typeCode, "B78", "B76", "A33", "A34")) return XP_TIER_3;
+
+        if (startsWithAny(typeCode, "A319", "A220", "E190", "E195", "AT72", "AT75", "CRJ", "DH8")) {
             return XP_TIER_2;
         }
 
-        if (containsAny(manufacturer, "AIRBUS", "BOEING")) {
+        if (startsWithAny(typeCode, "A320", "A321", "B737", "B738", "B739", "B73")) {
             return XP_TIER_1;
         }
 
@@ -526,12 +551,4 @@ public class FirebaseHandler {
         return value == null ? 0L : value;
     }
 
-    public static class LeaderboardEntry {
-        public String displayName;
-        public long xp;
-        public long updatedAtMs;
-
-        public LeaderboardEntry() {
-        }
-    }
 }

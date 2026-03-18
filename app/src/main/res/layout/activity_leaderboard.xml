@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/textTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Leaderboard"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerLeaderboard"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="12dp"
+        android:layout_weight="1" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:background="#CCCCCC" />
+
+    <TextView
+        android:id="@+id/textMyRankTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Your Rank"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:id="@+id/layoutMyRank"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/textMyRank"
+            android:layout_width="40dp"
+            android:layout_height="wrap_content"
+            android:text="-"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/textMyName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Player"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/textMyCaptures"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Captures: 0" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/textMyXp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 XP"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</LinearLayout>

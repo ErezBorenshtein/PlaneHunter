@@ -36,11 +36,11 @@
         android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/tvTypeCode"
+        android:id="@+id/tvTypeName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="Type: Loading..." />
+        android:text="Aircraft: Loading..." />
 
     <LinearLayout
         android:layout_width="match_parent"

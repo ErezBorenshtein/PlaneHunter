@@ -11,8 +11,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
     public double lon;
     public double altitude;
     public String registration;
-    public String model;
-    public String manufacturerName;
     public String typeCode;
     public String typeName;
     public double trackDeg = Double.NaN;
@@ -25,8 +23,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.altitude = altitude;
         this.trackDeg = trackDeg;
         this.registration = null;
-        this.model = null;
-        this.manufacturerName = null;
         this.typeName = null;
     }
 
@@ -38,8 +34,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.altitude = altitude;
         this.registration = registration;
         this.trackDeg = trackDeg;
-        this.model = null;
-        this.manufacturerName = null;
         this.typeName = null;
     }
 
@@ -51,8 +45,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.lon = lon;
         this.altitude = altitude;
         this.registration = registration;
-        this.model = model;
-        this.manufacturerName = manufacturerName;
         this.typeCode = typeCode;
         this.typeName = typeName;
         this.trackDeg = trackDeg;
@@ -65,8 +57,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
         lon = in.readDouble();
         altitude = in.readDouble();
         registration = in.readString();
-        model = in.readString();
-        manufacturerName = in.readString();
         typeCode = in.readString();
         typeName = in.readString();
         trackDeg = in.readDouble();
@@ -97,8 +87,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
         dest.writeDouble(lon);
         dest.writeDouble(altitude);
         dest.writeString(registration);
-        dest.writeString(model);
-        dest.writeString(manufacturerName);
         dest.writeString(typeCode);
         dest.writeString(typeName);
         dest.writeDouble(trackDeg);
@@ -112,21 +100,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.typeName = typeName;
     }
 
-    public String getManufacturerName() {
-        return manufacturerName;
-    }
-
-    public void setManufacturerName(String manufacturerName) {
-        this.manufacturerName = manufacturerName;
-    }
-
-    public String getModel() {
-        return model;
-    }
-
-    public void setModel(String model) {
-        this.model = model;
-    }
 
     public String getIcao24() {
         return icao24;
