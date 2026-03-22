@@ -25,7 +25,7 @@ public class UtilMath {
     }
 
     public static double bearingDeg(double lat1, double lon1, double lat2, double lon2) {
-        //get heading form curr location to plane
+        //get heading form current location to plane
         //https://www.movable-type.co.uk/scripts/latlong.html
         //θ = atan2( sin Δλ ⋅ cos φ2 , cos φ1 ⋅ sin φ2 − sin φ1 ⋅ cos φ2 ⋅ cos Δλ )
 

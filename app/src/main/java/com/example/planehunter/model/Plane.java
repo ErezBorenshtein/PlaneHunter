@@ -14,6 +14,7 @@ public class Plane implements Parcelable { //so I can use it in the intent
     public String typeCode;
     public String typeName;
     public double trackDeg = Double.NaN;
+    public long category;
 
     public Plane(String icao24, String callSign, double lat, double lon, double altitude, double trackDeg) {
         this.icao24 = icao24;
@@ -23,10 +24,9 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.altitude = altitude;
         this.trackDeg = trackDeg;
         this.registration = null;
-        this.typeName = null;
     }
 
-    public Plane(String icao24, String callSign, double lat, double lon, double altitude, String registration, double trackDeg) {
+    public Plane(String icao24, String callSign, double lat, double lon, double altitude, String registration, double trackDeg, int category) {
         this.icao24 = icao24;
         this.callSign = callSign;
         this.lat = lat;
@@ -34,7 +34,7 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.altitude = altitude;
         this.registration = registration;
         this.trackDeg = trackDeg;
-        this.typeName = null;
+        this.category = category;
     }
 
     public Plane(String icao24, String callSign, double lat, double lon, double altitude,
@@ -141,4 +141,11 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.registration = registration;
     }
 
+    public long getCategory() {
+        return category;
+    }
+
+    public void setCategory(long category) {
+        this.category = category;
+    }
 }

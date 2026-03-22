@@ -9,15 +9,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Shutter button -->
     <ImageButton
         android:id="@+id/btnShutter"
         android:layout_width="84dp"
         android:layout_height="84dp"
         android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="24dp"
+        android:layout_marginBottom="70dp"
         android:background="@android:color/transparent"
-        android:src="@android:drawable/ic_menu_camera"
-        android:contentDescription="Shutter" />
+        android:contentDescription="Shutter"
+        android:src="@android:drawable/ic_menu_camera" />
 
 </FrameLayout>

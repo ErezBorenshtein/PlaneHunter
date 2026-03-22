@@ -122,6 +122,8 @@ public class OpenSkyFetcher {
                 // 7 = altitude
                 // 8 = on_ground
                 // 10 = track
+                //...
+                //17 = category
                 // ------------------------------------------------------------
 
                 JSONObject data = new JSONObject(body); //response is JSON
@@ -148,8 +150,9 @@ public class OpenSkyFetcher {
                         String callSign = safe(state.optString(1, "N/A"));
                         double altitude = state.optDouble(7, 0.0);
                         double trackDeg = state.optDouble(10, Double.NaN);
+                        int category = state.optInt(17,-1);
 
-                        planes.add(new Plane(icao, callSign, lat, lon,altitude, null ,trackDeg));
+                        planes.add(new Plane(icao, callSign, lat, lon,altitude, null ,trackDeg,category));
                     }
                 }
 

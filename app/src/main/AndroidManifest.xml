@@ -20,11 +20,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PlaneHunter"
         tools:targetApi="31">
-
+        <activity
+            android:name=".ui.activities.Settings"
+            android:exported="false" />
         <activity
             android:name=".ui.activities.LeaderboardActivity"
             android:exported="false" />
-
         <activity
             android:name=".ui.activities.MainActivity"
             android:exported="true">
@@ -43,6 +44,7 @@
         <activity
             android:name=".ui.activities.CaptureGameActivity"
             android:exported="false" />
+
         <service
             android:name=".services.PlaneService"
             android:enabled="true"

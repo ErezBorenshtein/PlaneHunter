@@ -24,7 +24,9 @@ import com.google.firebase.firestore.SetOptions;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -153,6 +155,14 @@ public class FirebaseHandler {
 
             return doc.toObject(UserProfile.class);
         });
+    }
+
+    public Task<Void> updateAlertCategories(@NonNull ArrayList<Long> alertCategories) {
+        UserProfile profile = new UserProfile();
+        profile.alertCategories = new ArrayList<>(alertCategories);
+        profile.updatedAtMs = System.currentTimeMillis();
+
+        return myUserDoc().set(profile, SetOptions.merge());
     }
 
     public Task<Void> updateMySettings(boolean notifyEnabled, int radiusKm) {

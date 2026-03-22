@@ -45,8 +45,10 @@ public class RadarView extends View {
     private final Paint paintPlaneNormal = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint paintPlaneCooldown = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    private final Set<String> cooldownIcaos = new HashSet<>();
+    //for the locking of the plane list
     private final Object lock = new Object();
+
+    private final Set<String> cooldownIcaos = new HashSet<>();
     private final List<Blip> blips = new ArrayList<>();
     private ArrayList<Plane> lastPlanes = new ArrayList<>();
 
