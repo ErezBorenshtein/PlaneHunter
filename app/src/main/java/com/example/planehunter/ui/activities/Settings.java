@@ -1,14 +1,15 @@
 package com.example.planehunter.ui.activities;
 
+import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.planehunter.R;
+import com.example.planehunter.model.UserProfile;
 
 import com.example.planehunter.data.firebase.FirebaseHandler;
-import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.checkbox.MaterialCheckBox;
 
@@ -18,8 +19,6 @@ import java.util.Map;
 
 
 public class Settings extends AppCompatActivity {
-
-    private MaterialSwitch switchAlertsEnabled;
 
     private MaterialButton btnSelectAll;
     private MaterialButton btnClearAll;
@@ -36,16 +35,44 @@ public class Settings extends AppCompatActivity {
 
         init();
 
+        firebaseHandler.getMyProfile()
+                .addOnSuccessListener(profile -> {
+
+                    if (profile == null){ return;}
+
+                    List<Long> categories = profile.getAlertCategories();
+
+                    if (categories == null) {
+                        categories = UserProfile.getDefaultCategories();
+                    }
+
+                    setSelected(categories);
+                });
 
     }
 
+    private void setSelected(List<Long> categories) {
+
+        //unselect everything
+        for (MaterialCheckBox cb : categoryCheckboxes.values()) {
+            cb.setChecked(false);
+        }
+
+        //set selected
+        for (Long category : categories) {
+            MaterialCheckBox cb = categoryCheckboxes.get(category.intValue());
+            if (cb != null) {
+                cb.setChecked(true);
+            }
+        }
+
+    }
 
 
     public void init(){
 
         firebaseHandler = FirebaseHandler.getInstance();
 
-        switchAlertsEnabled = findViewById(R.id.switchAlertsEnabled);
         btnSelectAll = findViewById(R.id.buttonSelectAll);
         btnClearAll = findViewById(R.id.buttonClearAll);
         btnSave = findViewById(R.id.buttonSave);
@@ -75,14 +102,29 @@ public class Settings extends AppCompatActivity {
 
 
         btnSave.setOnClickListener(v ->{
-            List<Long> result = new ArrayList<>();
+            ArrayList<Long> result = new ArrayList<>();
 
             for (Map.Entry<Integer,MaterialCheckBox> entry:categoryCheckboxes.entrySet()) {
                 if(entry.getValue().isChecked()){
                     result.add(Long.valueOf(entry.getKey()));
                 }
             }
-            firebaseHandler
+            firebaseHandler.updateAlertCategories(result);
+
+            Intent intent = new Intent(this, MainActivity.class);
+            startActivity(intent);
+        });
+
+        btnSelectAll.setOnClickListener(v->{
+            for (MaterialCheckBox cb : categoryCheckboxes.values()) {
+                cb.setChecked(true);
+            }
+        });
+
+        btnClearAll.setOnClickListener(v->{
+            for (MaterialCheckBox cb : categoryCheckboxes.values()) {
+                cb.setChecked(false);
+            }
         });
     }
 }

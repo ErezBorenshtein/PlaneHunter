@@ -20,6 +20,8 @@ import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.example.planehunter.util.UtilMath;
 
@@ -35,11 +37,12 @@ public class PlaneService extends Service {
     public static final String ACTION_SET_APP_FOREGROUND = "com.example.planehunter.SET_APP_FOREGROUND";
     public static final String EXTRA_APP_FOREGROUND = "app_foreground";
 
-    private static final long DEFAULT_POLL_INTERVAL_MS = 60_000L;  // 1 minute
-    private static final long MIN_POLL_INTERVAL_MS = 2_000L;       // safety clamp
-    private static final long MAX_POLL_INTERVAL_MS = 5 * 60_000L;  // safety clamp
+    private static final long DEFAULT_POLL_INTERVAL = 60_000L;  // poll 1 minute
+    private static final long MIN_POLL_INTERVAL = 2_000L;       // safety clamp
+    private static final long MAX_POLL_INTERVAL = 5*60_000L;  // safety clamp
+    private static final long AIRCRAFT_ALERT_COOLDOWN = 30*60*1000L;
+    private static final long FOREGROUND_UPDATE = 5 * 60_000L;
 
-    private static final long FOREGROUND_UPDATE_MS = 5 * 60_000L;
     private long lastForegroundUpdateMs = 0;
 
     private Handler handler;
@@ -48,13 +51,15 @@ public class PlaneService extends Service {
 
     private OpenSkyFetcher fetcher;
 
-    private long pollIntervalMs = DEFAULT_POLL_INTERVAL_MS;
+    private long pollIntervalMs = DEFAULT_POLL_INTERVAL;
 
     // keep last known user location for UI/notification context
     //private double lastUserLat = Double.NaN;
     //private double lastUserLon = Double.NaN;
 
     private boolean isAppInForeground = false;
+
+    private final Map<String,Long> lastAlertedIcao24 =new HashMap<>();
 
     @Override
     public void onCreate() {
@@ -130,7 +135,7 @@ public class PlaneService extends Service {
 
     private void applyPollInterval(long requestedMs) {
 
-        pollIntervalMs = Math.max(MIN_POLL_INTERVAL_MS, Math.min(requestedMs, MAX_POLL_INTERVAL_MS));//for safety check if less than max
+        pollIntervalMs = Math.max(MIN_POLL_INTERVAL, Math.min(requestedMs, MAX_POLL_INTERVAL));//for safety check if less than max
 
         if (handler != null && task != null) {
             handler.removeCallbacks(task);//stop the task
@@ -196,15 +201,25 @@ public class PlaneService extends Service {
 
             Log.d(TAG, "Broadcast sent. planes=" + (planesFound == null ? 0 : planesFound.size()));
 
+            notifyForPlanes(lat, lon, planesFound);
+
             //update the foreground notification every 5 minutes
             long now = System.currentTimeMillis();
-            if (now - lastForegroundUpdateMs < FOREGROUND_UPDATE_MS) {
+            if (now - lastForegroundUpdateMs < FOREGROUND_UPDATE) {
                 return;
             }
 
             lastForegroundUpdateMs = now;
             updateForeground(lat, lon, planesFound);
         });
+    }
+
+    private void notifyForPlanes(double lat, double lon, ArrayList<Plane> planesFound) {
+        if(planesFound ==null || planesFound.isEmpty()){
+            return;
+        }
+
+
     }
 
     private void updateForeground(double userLat, double userLon, ArrayList<Plane> planesFound) {

@@ -162,7 +162,7 @@ public class FirebaseHandler {
         profile.alertCategories = new ArrayList<>(alertCategories);
         profile.updatedAtMs = System.currentTimeMillis();
 
-        return myUserDoc().set(profile, SetOptions.merge());
+        return myUserDoc().set(profile, SetOptions.merge()); //merges with the other categories
     }
 
     public Task<Void> updateMySettings(boolean notifyEnabled, int radiusKm) {

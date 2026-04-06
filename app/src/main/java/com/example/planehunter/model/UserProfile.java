@@ -36,13 +36,27 @@ public class UserProfile {
         long now = System.currentTimeMillis();
         this.createdAtMs = now;
         this.updatedAtMs = now;
-        alertCategories = new ArrayList<>();
 
-        //add default categories for notifications
-        alertCategories.add(4L); //Large airplanes
-        alertCategories.add(5L); //High Vortex Large
-        alertCategories.add(6L); //Havey
-        alertCategories.add(8L); //Rotorcraft
-        alertCategories.add(14L); //UAV
+        alertCategories = getDefaultCategories();
+
+    }
+
+    public static ArrayList<Long> getDefaultCategories(){
+        ArrayList<Long> defaults =new ArrayList<>();
+
+        defaults.add(4L); //Large airplanes
+        defaults.add(5L); //High Vortex Large
+        defaults.add(6L); //Havey
+        defaults.add(8L); //Rotorcraft
+        defaults.add(14L); //UAV
+        return defaults;
+    }
+
+    public List<Long> getAlertCategories() {
+        return alertCategories;
+    }
+
+    public void setAlertCategories(List<Long> alertCategories) {
+        this.alertCategories = alertCategories;
     }
 }

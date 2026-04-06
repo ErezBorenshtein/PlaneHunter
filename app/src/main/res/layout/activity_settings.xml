@@ -34,16 +34,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Master switch -->
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/switchAlertsEnabled"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Enable aircraft alerts"
-            app:layout_constraintTop_toBottomOf="@id/textSubtitle"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+
 
         <!-- Quick actions -->
         <com.google.android.material.button.MaterialButton
@@ -54,7 +45,7 @@
             android:layout_marginTop="16dp"
             android:layout_marginEnd="8dp"
             android:text="Select all"
-            app:layout_constraintTop_toBottomOf="@id/switchAlertsEnabled"
+            app:layout_constraintTop_toBottomOf="@id/textSubtitle"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toStartOf="@id/buttonClearAll"
             app:layout_constraintHorizontal_weight="1" />
@@ -67,7 +58,7 @@
             android:layout_marginTop="16dp"
             android:layout_marginStart="8dp"
             android:text="Clear all"
-            app:layout_constraintTop_toBottomOf="@id/switchAlertsEnabled"
+            app:layout_constraintTop_toBottomOf="@id/textSubtitle"
             app:layout_constraintStart_toEndOf="@id/buttonSelectAll"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_weight="1" />
