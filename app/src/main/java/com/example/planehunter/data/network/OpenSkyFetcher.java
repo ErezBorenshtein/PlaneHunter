@@ -66,7 +66,7 @@ public class OpenSkyFetcher {
                 double[] bbox = boundingBox(latCenter, lonCenter, radiusKm);
 
                 String urlString = String.format(
-                        "https://opensky-network.org/api/states/all?lamin=%f&lamax=%f&lomin=%f&lomax=%f",
+                        "https://opensky-network.org/api/states/all?lamin=%f&lamax=%f&lomin=%f&lomax=%f&extended=1",
                         bbox[0], bbox[1], bbox[2], bbox[3]
                 );
 
@@ -103,7 +103,7 @@ public class OpenSkyFetcher {
                 }
 
                 // ------------------------------------------------------------
-                // OpenSky API response format (simplified)
+                // OpenSky API response format
                 //
                 // {
                 //   "time": 1710000000,
@@ -134,6 +134,9 @@ public class OpenSkyFetcher {
                 if (states != null) {
                     for (int i = 0; i < states.length(); i++) { //go over each state(plane)
                         JSONArray state = states.optJSONArray(i);
+
+                        Log.d(TAG, "state[" + i + "] raw=" + state.toString());
+
                         if (state == null) continue;
 
                         boolean onGround = state.optBoolean(8, false);
@@ -151,6 +154,7 @@ public class OpenSkyFetcher {
                         double altitude = state.optDouble(7, 0.0);
                         double trackDeg = state.optDouble(10, Double.NaN);
                         int category = state.optInt(17,-1);
+
 
                         planes.add(new Plane(icao, callSign, lat, lon,altitude, null ,trackDeg,category));
                     }

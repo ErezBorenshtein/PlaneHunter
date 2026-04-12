@@ -1,6 +1,7 @@
 package com.example.planehunter.services;
 
 import android.Manifest;
+import android.app.Notification;
 import android.app.Service;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -9,11 +10,15 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 
 import com.example.planehunter.R;
+import com.example.planehunter.data.firebase.FirebaseHandler;
 import com.example.planehunter.data.network.OpenSkyFetcher;
 import com.example.planehunter.model.Plane;
+import com.example.planehunter.model.UserProfile;
 import com.example.planehunter.notifications.NotificationHelper;
 import com.example.planehunter.receivers.PlaneBroadcast;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -21,9 +26,12 @@ import com.google.android.gms.location.LocationServices;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.example.planehunter.util.UtilMath;
+import com.google.firebase.firestore.ListenerRegistration;
 
 public class PlaneService extends Service {
 
@@ -53,13 +61,12 @@ public class PlaneService extends Service {
 
     private long pollIntervalMs = DEFAULT_POLL_INTERVAL;
 
-    // keep last known user location for UI/notification context
-    //private double lastUserLat = Double.NaN;
-    //private double lastUserLon = Double.NaN;
-
+    private FirebaseHandler firebaseHandler;
     private boolean isAppInForeground = false;
 
+    private ListenerRegistration profileListenerRegistration;
     private final Map<String,Long> lastAlertedIcao24 =new HashMap<>();
+    private final Set<Long> selectedAlertCategories = new HashSet<>();
 
     @Override
     public void onCreate() {
@@ -83,6 +90,9 @@ public class PlaneService extends Service {
         String id = getString(R.string.opensky_client_id);
         String secret = getString(R.string.opensky_client_secret);
         fetcher.setClientCredentials(id, secret);
+
+        firebaseHandler = FirebaseHandler.getInstance();
+        startListeningToProfileSettings();
 
         //creates a loop with delay
         handler = new Handler(Looper.getMainLooper());
@@ -118,6 +128,11 @@ public class PlaneService extends Service {
     public void onDestroy() {
         //stop service
         Log.d(TAG, "PlaneService destroyed");
+
+        if(profileListenerRegistration != null){
+            profileListenerRegistration.remove();
+            profileListenerRegistration = null;
+        }
 
         if (handler != null && task != null) {
             handler.removeCallbacks(task);
@@ -214,12 +229,82 @@ public class PlaneService extends Service {
         });
     }
 
-    private void notifyForPlanes(double lat, double lon, ArrayList<Plane> planesFound) {
+    private void notifyForPlanes(double userLat, double userLon, ArrayList<Plane> planesFound) {
+        Log.d("here","notify");
         if(planesFound ==null || planesFound.isEmpty()){
             return;
         }
 
+        if (selectedAlertCategories.isEmpty()) {
+            return;
+        }
 
+
+        for (Plane plane: planesFound) {
+            if(plane == null)
+                continue;
+
+            long category = plane.getCategory();
+            if(!selectedAlertCategories.contains((long) category)){
+                Log.d("here",Long.toString(category));
+                continue;
+
+            }
+
+            if(wasRecentlyAlerted(plane)){
+                continue;
+            }
+
+            double planeLat = plane.getLat();
+            double planeLon = plane.getLon();
+            if (Double.isNaN(userLat) || Double.isNaN(userLon)) {
+                continue;
+            }
+
+            double distanceKm = UtilMath.haversineMeters(planeLat, planeLon, userLat, userLon) / 1000.0;
+            if (distanceKm > fetcher.getRadiusKm()) {
+                continue;
+            }
+
+            String regOrIcao = plane.getRegistration();
+
+            if(regOrIcao == null ||regOrIcao.trim().isEmpty()){
+                regOrIcao = plane.icao24;
+            }
+
+            String title = "Cool aircraft nearby";
+            String text = regOrIcao+
+                    " • category " + category
+                    + " • " + formatKm(distanceKm) + " km away";
+
+            Log.d("here","notifi");
+            NotificationHelper.showAircraftAlert(this,title, text, plane.icao24);
+
+            markPlaneAlerted(plane);
+        }
+    }
+
+    private boolean wasRecentlyAlerted(Plane plane) {
+        String icao24 = plane.getIcao24();
+        if (icao24 == null || icao24.trim().isEmpty()) {
+            return false;
+        }
+
+        Long lastTime = lastAlertedIcao24.get(icao24);
+        if (lastTime == null) {
+            return false;
+        }
+
+        return System.currentTimeMillis() - lastTime < AIRCRAFT_ALERT_COOLDOWN;
+    }
+
+    private void markPlaneAlerted(Plane plane) {
+        String icao24 = plane.getIcao24();
+        if (icao24 == null || icao24.trim().isEmpty()) {
+            return;
+        }
+
+        lastAlertedIcao24.put(icao24, System.currentTimeMillis());
     }
 
     private void updateForeground(double userLat, double userLon, ArrayList<Plane> planesFound) {
@@ -275,5 +360,24 @@ public class PlaneService extends Service {
         return String.valueOf(Math.round(km));
     }
 
+    private  void startListeningToProfileSettings(){
+        profileListenerRegistration = firebaseHandler.listenToMyProfile(new FirebaseHandler.ProfileListener() {
+            @Override
+            public void onProfile(@Nullable UserProfile profile) {
+                if(profile ==null){
+                    return;
+                }
+                selectedAlertCategories.clear();
+                if (profile.alertCategories != null){
+                    selectedAlertCategories.addAll(profile.alertCategories);
+                }
+            }
+
+            @Override
+            public void onError(@NonNull Exception e) {
+                Log.e(TAG, "Failed to listen to  profile",e);
+            }
+        });
+    }
 
 }

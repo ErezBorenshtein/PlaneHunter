@@ -48,8 +48,13 @@ public class MainActivity extends AppCompatActivity {
     private final BroadcastReceiver planesReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent == null) return;
-            if (!PlaneBroadcast.ACTION_PLANES_UPDATED.equals(intent.getAction())) return;
+            if (intent == null) {
+                return;
+            }
+
+            if (!PlaneBroadcast.ACTION_PLANES_UPDATED.equals(intent.getAction())) {
+                return;
+            }
 
             Log.d(TAG, "planes update received");
 
@@ -57,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
             double userLon = PlaneBroadcast.getUserLon(intent);
             ArrayList<Plane> planes = PlaneBroadcast.getPlanes(intent);
 
-            Log.d(TAG, "planes=" + planes.size());
+            Log.d(TAG, "planes=" + (planes == null ? 0 : planes.size()));
 
             radarView.setUserLocation(userLat, userLon);
             radarView.setPlanes(planes);
@@ -72,7 +77,9 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                // If foreground permissions are OK, request background separately
+                startPlaneServiceIfNeeded();
+                setServicePollInterval(25_000L);
+                setAppForegroundState(true);
                 requestBackgroundLocationIfNeeded();
             });
 
@@ -102,48 +109,9 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
-        radarView = findViewById(R.id.radarView);
-        btnLogout = findViewById(R.id.btnLogout);
-        btnLeaderBoard = findViewById(R.id.btnLeaderboard);
-        btnSettings = findViewById(R.id.btnSettings);
-
-        radarView.setOnPlaneClickListener(plane -> {
-            radarView.setSelectedPlane(plane);
-
-            PlaneSheet sheet = PlaneSheet.newInstance(plane);
-            sheet.setListener(p -> {
-                pendingCapturePlane = p;
-
-                Intent i = new Intent(this, CaptureGameActivity.class);
-                i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
-                i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
-                startActivityForResult(i, REQUEST_CAPTURE_GAME);
-            });
-
-            sheet.show(getSupportFragmentManager(), "plane_sheet");
-        });
-
-        btnLogout.setOnClickListener(view -> {
-            isLoggingOut = true;
-
-            FirebaseHandler.getInstance().signOut();
-            stopPlaneService();
-
-            Intent i = new Intent(this, LogIn.class);
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(i);
-            finish();
-        });
-
-        btnLeaderBoard.setOnClickListener(view -> {
-            Intent intent = new Intent(MainActivity.this, LeaderboardActivity.class);
-            startActivity(intent);
-        });
-
-        btnSettings.setOnClickListener(View ->{
-            Intent intent = new Intent(MainActivity.this, Settings.class);
-            startActivity(intent);
-        });
+        initViews();
+        setupRadar();
+        setupButtons();
 
         // Temporary
         radarView.setRadarRangeMeters(300_000.0); // 300 km
@@ -157,10 +125,14 @@ public class MainActivity extends AppCompatActivity {
         registerPlanesReceiver();
         loadCooldownPlanes();
 
-        // setServicePollInterval(3_000L); // update every 3 seconds when app is opened
-        setServicePollInterval(25_000L); // update every 25 seconds when app is opened
-        setAppForegroundState(true);
-
+        if (hasAllRequiredPermissions()) {
+            startPlaneServiceIfNeeded();
+            setServicePollInterval(25_000L);
+            setAppForegroundState(true);
+            requestBackgroundLocationIfNeeded();
+        } else {
+            ensurePermissions();
+        }
     }
 
     @Override
@@ -172,8 +144,10 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        setServicePollInterval(60_000L * 3);
-        setAppForegroundState(false);
+        if (hasForegroundLocationPermission()) {
+            setServicePollInterval(60_000L * 3);
+            setAppForegroundState(false);
+        }
     }
 
     @Override
@@ -212,7 +186,7 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
 
-                    radarView.addCooldownIcao(pendingCapturePlane.getIcao24());//add plane to cooldwon list
+                    radarView.addCooldownIcao(pendingCapturePlane.getIcao24());
 
                     String msg = result.firstTime
                             ? "New plane! +" + result.xpAwarded + " XP"
@@ -227,6 +201,55 @@ public class MainActivity extends AppCompatActivity {
                 ).show());
     }
 
+    private void initViews() {
+        radarView = findViewById(R.id.radarView);
+        btnLogout = findViewById(R.id.btnLogout);
+        btnLeaderBoard = findViewById(R.id.btnLeaderboard);
+        btnSettings = findViewById(R.id.btnSettings);
+    }
+
+    private void setupRadar() {
+        radarView.setOnPlaneClickListener(plane -> {
+            radarView.setSelectedPlane(plane);
+
+            PlaneSheet sheet = PlaneSheet.newInstance(plane);
+            sheet.setListener(p -> {
+                pendingCapturePlane = p;
+
+                Intent i = new Intent(this, CaptureGameActivity.class);
+                i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
+                i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
+                startActivityForResult(i, REQUEST_CAPTURE_GAME);
+            });
+
+            sheet.show(getSupportFragmentManager(), "plane_sheet");
+        });
+    }
+
+    private void setupButtons() {
+        btnLogout.setOnClickListener(view -> {
+            isLoggingOut = true;
+
+            FirebaseHandler.getInstance().signOut();
+            stopPlaneService();
+
+            Intent i = new Intent(this, LogIn.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(i);
+            finish();
+        });
+
+        btnLeaderBoard.setOnClickListener(view -> {
+            Intent intent = new Intent(MainActivity.this, LeaderboardActivity.class);
+            startActivity(intent);
+        });
+
+        btnSettings.setOnClickListener(view -> {
+            Intent intent = new Intent(MainActivity.this, Settings.class);
+            startActivity(intent);
+        });
+    }
+
     private void loadCooldownPlanes() {
         FirebaseHandler.getInstance()
                 .getMyPlanesInCooldown()
@@ -235,17 +258,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void registerPlanesReceiver() {
-        if (isReceiverRegistered) return;
+        if (isReceiverRegistered) {
+            return;
+        }
 
         IntentFilter filter = new IntentFilter(PlaneBroadcast.ACTION_PLANES_UPDATED);
-
         registerReceiver(planesReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-
         isReceiverRegistered = true;
     }
 
     private void unregisterReceiverSafe() {
-        if (!isReceiverRegistered) return;
+        if (!isReceiverRegistered) {
+            return;
+        }
 
         try {
             unregisterReceiver(planesReceiver);
@@ -263,6 +288,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void ensurePermissions() {
         if (hasAllRequiredPermissions()) {
+            startPlaneServiceIfNeeded();
+            setServicePollInterval(25_000L);
+            setAppForegroundState(true);
             requestBackgroundLocationIfNeeded();
             return;
         }
@@ -271,9 +299,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean hasAllRequiredPermissions() {
-        boolean hasLoc =
-                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                        || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean hasLoc = hasForegroundLocationPermission();
 
         boolean hasNotif = true;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -284,24 +310,37 @@ public class MainActivity extends AppCompatActivity {
         return hasLoc && hasNotif;
     }
 
+    private boolean hasForegroundLocationPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
     private boolean hasBackgroundLocationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return true;
+        }
+
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestBackgroundLocationIfNeeded() {
         // Must request separately after foreground location is granted
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
-        if (!hasForegroundLocationPermission()) return;
-        if (hasBackgroundLocationPermission()) return;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return;
+        }
+
+        if (!hasForegroundLocationPermission()) {
+            return;
+        }
+
+        if (hasBackgroundLocationPermission()) {
+            return;
+        }
 
         backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
-    }
-
-    private boolean hasForegroundLocationPermission() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
     @NonNull
@@ -320,6 +359,16 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION
         };
+    }
+
+    private void startPlaneServiceIfNeeded() {
+        if (!hasForegroundLocationPermission()) {
+            Log.w(TAG, "Cannot start PlaneService without location permission");
+            return;
+        }
+
+        Intent i = new Intent(this, PlaneService.class);
+        ContextCompat.startForegroundService(this, i);
     }
 
     private void setServicePollInterval(long ms) {

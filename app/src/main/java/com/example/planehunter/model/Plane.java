@@ -148,4 +148,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
     public void setCategory(long category) {
         this.category = category;
     }
+
+
 }
