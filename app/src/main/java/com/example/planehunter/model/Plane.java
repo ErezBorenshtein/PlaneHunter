@@ -3,7 +3,7 @@ package com.example.planehunter.model;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-public class Plane implements Parcelable { //so I can use it in the intent
+public class Plane implements Parcelable {
 
     public String icao24;
     public String callSign;
@@ -13,8 +13,11 @@ public class Plane implements Parcelable { //so I can use it in the intent
     public String registration;
     public String typeCode;
     public String typeName;
+    public String ownerOperator;
+    public String photoUrl;
     public double trackDeg = Double.NaN;
-    public long category;
+    public long category = AircraftCategory.UNKNOWN;
+    public boolean isMilitary = false;
 
     public Plane(String icao24, String callSign, double lat, double lon, double altitude, double trackDeg) {
         this.icao24 = icao24;
@@ -23,7 +26,6 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.lon = lon;
         this.altitude = altitude;
         this.trackDeg = trackDeg;
-        this.registration = null;
     }
 
     public Plane(String icao24, String callSign, double lat, double lon, double altitude, String registration, double trackDeg, int category) {
@@ -37,8 +39,19 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.category = category;
     }
 
-    public Plane(String icao24, String callSign, double lat, double lon, double altitude,
-                 String registration, String model, String manufacturerName, String typeCode, double trackDeg, String typeName) {
+    public Plane(
+            String icao24,
+            String callSign,
+            double lat,
+            double lon,
+            double altitude,
+            String registration,
+            String model,
+            String manufacturerName,
+            String typeCode,
+            double trackDeg,
+            String typeName
+    ) {
         this.icao24 = icao24;
         this.callSign = callSign;
         this.lat = lat;
@@ -59,7 +72,11 @@ public class Plane implements Parcelable { //so I can use it in the intent
         registration = in.readString();
         typeCode = in.readString();
         typeName = in.readString();
+        ownerOperator = in.readString();
+        photoUrl = in.readString();
         trackDeg = in.readDouble();
+        category = in.readLong();
+        isMilitary = in.readByte() != 0;
     }
 
     public static final Creator<Plane> CREATOR = new Creator<Plane>() {
@@ -89,17 +106,13 @@ public class Plane implements Parcelable { //so I can use it in the intent
         dest.writeString(registration);
         dest.writeString(typeCode);
         dest.writeString(typeName);
+        dest.writeString(ownerOperator);
+        dest.writeString(photoUrl);
         dest.writeDouble(trackDeg);
+        dest.writeLong(category);
+        dest.writeByte((byte) (isMilitary ? 1 : 0)); //boolean doesn't work with all parcelable versions
+        //dest.writeBoolean(isMilitary);
     }
-
-    public String getTypeName() {
-        return typeName;
-    }
-
-    public void setTypeName(String typeName) {
-        this.typeName = typeName;
-    }
-
 
     public String getIcao24() {
         return icao24;
@@ -129,6 +142,10 @@ public class Plane implements Parcelable { //so I can use it in the intent
         return registration;
     }
 
+    public void setRegistration(String registration) {
+        this.registration = registration;
+    }
+
     public String getTypeCode() {
         return typeCode;
     }
@@ -137,8 +154,28 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.typeCode = typeCode;
     }
 
-    public void setRegistration(String registration) {
-        this.registration = registration;
+    public String getTypeName() {
+        return typeName;
+    }
+
+    public void setTypeName(String typeName) {
+        this.typeName = typeName;
+    }
+
+    public String getOwnerOperator() {
+        return ownerOperator;
+    }
+
+    public void setOwnerOperator(String ownerOperator) {
+        this.ownerOperator = ownerOperator;
+    }
+
+    public String getPhotoUrl() {
+        return photoUrl;
+    }
+
+    public void setPhotoUrl(String photoUrl) {
+        this.photoUrl = photoUrl;
     }
 
     public long getCategory() {
@@ -149,5 +186,11 @@ public class Plane implements Parcelable { //so I can use it in the intent
         this.category = category;
     }
 
+    public boolean isMilitary() {
+        return isMilitary;
+    }
 
+    public void setMilitary(boolean military) {
+        isMilitary = military;
+    }
 }

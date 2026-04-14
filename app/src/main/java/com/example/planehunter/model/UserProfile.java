@@ -42,14 +42,7 @@ public class UserProfile {
     }
 
     public static ArrayList<Long> getDefaultCategories(){
-        ArrayList<Long> defaults =new ArrayList<>();
-
-        defaults.add(4L); //Large airplanes
-        defaults.add(5L); //High Vortex Large
-        defaults.add(6L); //Havey
-        defaults.add(8L); //Rotorcraft
-        defaults.add(14L); //UAV
-        return defaults;
+        return AircraftCategory.getDefaultAlertCategories();
     }
 
     public List<Long> getAlertCategories() {

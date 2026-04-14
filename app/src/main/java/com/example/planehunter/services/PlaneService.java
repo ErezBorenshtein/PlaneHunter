@@ -1,7 +1,6 @@
 package com.example.planehunter.services;
 
 import android.Manifest;
-import android.app.Notification;
 import android.app.Service;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -17,12 +16,16 @@ import androidx.core.app.ActivityCompat;
 import com.example.planehunter.R;
 import com.example.planehunter.data.firebase.FirebaseHandler;
 import com.example.planehunter.data.network.OpenSkyFetcher;
+import com.example.planehunter.data.network.SkyLinkFetcher;
+import com.example.planehunter.model.AircraftCategory;
 import com.example.planehunter.model.Plane;
 import com.example.planehunter.model.UserProfile;
 import com.example.planehunter.notifications.NotificationHelper;
 import com.example.planehunter.receivers.PlaneBroadcast;
+import com.example.planehunter.util.UtilMath;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,14 +33,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import com.example.planehunter.util.UtilMath;
-import com.google.firebase.firestore.ListenerRegistration;
-
 public class PlaneService extends Service {
 
     private static final String TAG = "PlaneServiceDebug";
     private static final int FOREGROUND_ID = 1;
-
 
     public static final String ACTION_SET_POLL_INTERVAL = "com.example.planehunter.SET_POLL_INTERVAL";
     public static final String EXTRA_POLL_INTERVAL_MS = "poll_interval_ms";
@@ -45,10 +44,10 @@ public class PlaneService extends Service {
     public static final String ACTION_SET_APP_FOREGROUND = "com.example.planehunter.SET_APP_FOREGROUND";
     public static final String EXTRA_APP_FOREGROUND = "app_foreground";
 
-    private static final long DEFAULT_POLL_INTERVAL = 60_000L;  // poll 1 minute
-    private static final long MIN_POLL_INTERVAL = 2_000L;       // safety clamp
-    private static final long MAX_POLL_INTERVAL = 5*60_000L;  // safety clamp
-    private static final long AIRCRAFT_ALERT_COOLDOWN = 30*60*1000L;
+    private static final long DEFAULT_POLL_INTERVAL = 60_000L;
+    private static final long MIN_POLL_INTERVAL = 2_000L;
+    private static final long MAX_POLL_INTERVAL = 5 * 60_000L;
+    private static final long AIRCRAFT_ALERT_COOLDOWN = 30 * 60 * 1000L;
     private static final long FOREGROUND_UPDATE = 5 * 60_000L;
 
     private long lastForegroundUpdateMs = 0;
@@ -58,6 +57,7 @@ public class PlaneService extends Service {
     private FusedLocationProviderClient locationClient;
 
     private OpenSkyFetcher fetcher;
+    private SkyLinkFetcher skyLinkFetcher;
 
     private long pollIntervalMs = DEFAULT_POLL_INTERVAL;
 
@@ -65,7 +65,7 @@ public class PlaneService extends Service {
     private boolean isAppInForeground = false;
 
     private ListenerRegistration profileListenerRegistration;
-    private final Map<String,Long> lastAlertedIcao24 =new HashMap<>();
+    private final Map<String, Long> lastAlertedIcao24 = new HashMap<>();
     private final Set<Long> selectedAlertCategories = new HashSet<>();
 
     @Override
@@ -74,7 +74,6 @@ public class PlaneService extends Service {
 
         NotificationHelper.ensureChannels(this);
 
-        //start foreground with a single ongoing notification
         startForeground(
                 FOREGROUND_ID,
                 NotificationHelper.buildForegroundNotification(this,
@@ -82,22 +81,22 @@ public class PlaneService extends Service {
                         "Starting...")
         );
 
-        locationClient = LocationServices.getFusedLocationProviderClient(this);//start location tracking
+        locationClient = LocationServices.getFusedLocationProviderClient(this);
 
         fetcher = new OpenSkyFetcher();
-        //fetcher.setRadiusKm(300); //!temporary for testing
-        fetcher.setRadiusKm(150); //!temporary for testing
+        fetcher.setRadiusKm(150);
 
-        String id = getString(R.string.opensky_client_id);
-        String secret = getString(R.string.opensky_client_secret);
-        fetcher.setClientCredentials(id, secret);
+        String openSkyId = getString(R.string.opensky_client_id);
+        String openSkySecret = getString(R.string.opensky_client_secret);
+        fetcher.setClientCredentials(openSkyId, openSkySecret);
+
+        skyLinkFetcher = new SkyLinkFetcher(getApplicationContext(), getString(R.string.skylink_key));
 
         firebaseHandler = FirebaseHandler.getInstance();
         startListeningToProfileSettings();
 
-        //creates a loop with delay
         handler = new Handler(Looper.getMainLooper());
-        task = () -> { //runable variable
+        task = () -> {
             pollOnce();
             handler.postDelayed(task, pollIntervalMs);
         };
@@ -107,16 +106,14 @@ public class PlaneService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-
         if (intent != null) {
-
-            if (ACTION_SET_APP_FOREGROUND.equals(intent.getAction())) { //update foreground message
+            if (ACTION_SET_APP_FOREGROUND.equals(intent.getAction())) {
                 isAppInForeground = intent.getBooleanExtra(EXTRA_APP_FOREGROUND, false);
                 Log.d(TAG, "App foreground = " + isAppInForeground);
                 return START_STICKY;
             }
 
-            if (ACTION_SET_POLL_INTERVAL.equals(intent.getAction())) { //update interval time
+            if (ACTION_SET_POLL_INTERVAL.equals(intent.getAction())) {
                 long ms = intent.getLongExtra(EXTRA_POLL_INTERVAL_MS, pollIntervalMs);
                 applyPollInterval(ms);
                 return START_STICKY;
@@ -127,10 +124,9 @@ public class PlaneService extends Service {
 
     @Override
     public void onDestroy() {
-        //stop service
         Log.d(TAG, "PlaneService destroyed");
 
-        if(profileListenerRegistration != null){
+        if (profileListenerRegistration != null) {
             profileListenerRegistration.remove();
             profileListenerRegistration = null;
         }
@@ -139,47 +135,34 @@ public class PlaneService extends Service {
             handler.removeCallbacks(task);
         }
 
-        stopForeground(STOP_FOREGROUND_REMOVE);//stop and remove the notification;
-
+        stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
     }
 
     @Override
-    public IBinder onBind(Intent intent) {//not bounded service
+    public IBinder onBind(Intent intent) {
         return null;
     }
 
     private void applyPollInterval(long requestedMs) {
-
-        pollIntervalMs = Math.max(MIN_POLL_INTERVAL, Math.min(requestedMs, MAX_POLL_INTERVAL));//for safety check if less than max
+        pollIntervalMs = Math.max(MIN_POLL_INTERVAL, Math.min(requestedMs, MAX_POLL_INTERVAL));
 
         if (handler != null && task != null) {
-            handler.removeCallbacks(task);//stop the task
-            handler.post(task); //restart the task with new interval
+            handler.removeCallbacks(task);
+            handler.post(task);
         }
 
         Log.d(TAG, "Poll interval updated to " + pollIntervalMs + " ms");
     }
 
     private void pollOnce() {
-
         if (!hasLocationPermission()) {
             Log.w(TAG, "No location permission");
             return;
         }
 
-        //android studio wanted me to put this too
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
-                PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) !=
-                        PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
 
@@ -193,9 +176,6 @@ public class PlaneService extends Service {
                     double lat = location.getLatitude();
                     double lon = location.getLongitude();
 
-                    //lastUserLat = lat;
-                    //lastUserLon = lon;
-
                     fetchBroadcastAndUpdateFg(lat, lon);
                 })
                 .addOnFailureListener(e -> Log.e(TAG, "Failed to get location", e));
@@ -207,32 +187,29 @@ public class PlaneService extends Service {
     }
 
     private void fetchBroadcastAndUpdateFg(double lat, double lon) {
+        fetcher.fetchPlanes(lat, lon, planesFound ->
+                skyLinkFetcher.enrichPlanesAsync(planesFound, () -> {
+                    Intent intent = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);
+                    intent.setPackage(getPackageName());
+                    sendBroadcast(intent);
 
-        fetcher.fetchPlanes(lat, lon, planesFound -> {
+                    Log.d(TAG, "Broadcast sent. planes=" + (planesFound == null ? 0 : planesFound.size()));
 
-            //broadcast data to app (to the UI)
-            Intent intent = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);
-            intent.setPackage(getPackageName());
-            sendBroadcast(intent);
+                    notifyForPlanes(lat, lon, planesFound);
 
-            Log.d(TAG, "Broadcast sent. planes=" + (planesFound == null ? 0 : planesFound.size()));
+                    long now = System.currentTimeMillis();
+                    if (now - lastForegroundUpdateMs < FOREGROUND_UPDATE) {
+                        return;
+                    }
 
-            notifyForPlanes(lat, lon, planesFound);
-
-            //update the foreground notification every 5 minutes
-            long now = System.currentTimeMillis();
-            if (now - lastForegroundUpdateMs < FOREGROUND_UPDATE) {
-                return;
-            }
-
-            lastForegroundUpdateMs = now;
-            updateForeground(lat, lon, planesFound);
-        });
+                    lastForegroundUpdateMs = now;
+                    updateForeground(lat, lon, planesFound);
+                })
+        );
     }
 
     private void notifyForPlanes(double userLat, double userLon, ArrayList<Plane> planesFound) {
-        Log.d("here","notify");
-        if(planesFound ==null || planesFound.isEmpty()){
+        if (planesFound == null || planesFound.isEmpty()) {
             return;
         }
 
@@ -240,19 +217,21 @@ public class PlaneService extends Service {
             return;
         }
 
-
-        for (Plane plane: planesFound) {
-            if(plane == null)
+        for (Plane plane : planesFound) {
+            if (plane == null) {
                 continue;
-
-            long category = plane.getCategory();
-            if(!selectedAlertCategories.contains((long) category)){
-                Log.d("here",Long.toString(category));
-                continue;
-
             }
 
-            if(wasRecentlyAlerted(plane)){
+            long category = plane.getCategory();
+            if (category == AircraftCategory.UNKNOWN) {
+                continue;
+            }
+
+            if (!selectedAlertCategories.contains(category)) {
+                continue;
+            }
+
+            if (wasRecentlyAlerted(plane)) {
                 continue;
             }
 
@@ -268,19 +247,19 @@ public class PlaneService extends Service {
             }
 
             String regOrIcao = plane.getRegistration();
-
-            if(regOrIcao == null ||regOrIcao.trim().isEmpty()){
-                regOrIcao = plane.icao24;
+            if (regOrIcao == null || regOrIcao.trim().isEmpty()) {
+                regOrIcao = plane.getIcao24();
             }
 
             String title = "Cool aircraft nearby";
-            String text = regOrIcao+
-                    " • category " + category
-                    + " • " + formatKm(distanceKm) + " km away";
+            String text = regOrIcao
+                    + " • "
+                    + AircraftCategory.getDisplayName(category)
+                    + " • "
+                    + formatKm(distanceKm)
+                    + " km away";
 
-            Log.d("here","notifi");
-            NotificationHelper.showAircraftAlert(this,title, text, plane.icao24);
-
+            NotificationHelper.showAircraftAlert(this, title, text, plane.getIcao24());
             markPlaneAlerted(plane);
         }
     }
@@ -309,7 +288,6 @@ public class PlaneService extends Service {
     }
 
     private void updateForeground(double userLat, double userLon, ArrayList<Plane> planesFound) {
-
         int count = (planesFound == null) ? 0 : planesFound.size();
         double closestKm = findClosestPlaneDistance(userLat, userLon, planesFound);
 
@@ -326,7 +304,6 @@ public class PlaneService extends Service {
             text = count + " planes in " + radius + "km • closest: " + formatKm(closestKm) + " km";
         }
 
-        //update the foreground notification (same ID)
         startForeground(
                 FOREGROUND_ID,
                 NotificationHelper.buildForegroundNotification(this, title, text)
@@ -336,24 +313,23 @@ public class PlaneService extends Service {
     private double findClosestPlaneDistance(double userLat, double userLon, ArrayList<Plane> planesFound) {
         if (planesFound == null || planesFound.isEmpty()) return Double.NaN;
 
-        double minKm = fetcher.getRadiusKm(); //closest plane can be maximum in radius
+        double minKm = fetcher.getRadiusKm();
 
-        for (Plane p : planesFound) { //go over each plane and calc distance
-            if (p == null) continue; //for safety
+        for (Plane p : planesFound) {
+            if (p == null) continue;
 
             double lat = p.getLat();
             double lon = p.getLon();
             if (Double.isNaN(lat) || Double.isNaN(lon)) continue;
 
-            double d = UtilMath.haversineMeters(userLat, userLon, lat, lon)/1000;//convert meters to KM
+            double d = UtilMath.haversineMeters(userLat, userLon, lat, lon) / 1000.0;
             if (d < minKm) minKm = d;
         }
 
-        return (minKm == fetcher.getRadiusKm()) ? Double.NaN : minKm; //NaN if not in radius else minKm
+        return (minKm == fetcher.getRadiusKm()) ? Double.NaN : minKm;
     }
 
     private String formatKm(double km) {
-        //if under 10->in decimal else->round number
         if (Double.isNaN(km)) return "?";
         if (km < 10.0) {
             return String.format(java.util.Locale.US, "%.1f", km);
@@ -361,24 +337,28 @@ public class PlaneService extends Service {
         return String.valueOf(Math.round(km));
     }
 
-    private  void startListeningToProfileSettings(){
+    private void startListeningToProfileSettings() {
         profileListenerRegistration = firebaseHandler.listenToMyProfile(new FirebaseHandler.ProfileListener() {
             @Override
             public void onProfile(@Nullable UserProfile profile) {
-                if(profile ==null){
+                selectedAlertCategories.clear();
+
+                if (profile == null) {
+                    selectedAlertCategories.addAll(AircraftCategory.getDefaultAlertCategories());
                     return;
                 }
-                selectedAlertCategories.clear();
-                if (profile.alertCategories != null){
-                    selectedAlertCategories.addAll(profile.alertCategories);
-                }
+
+                selectedAlertCategories.addAll(
+                        AircraftCategory.normalizeAlertCategories(profile.getAlertCategories())
+                );
             }
 
             @Override
             public void onError(@NonNull Exception e) {
-                Log.e(TAG, "Failed to listen to  profile",e);
+                Log.e(TAG, "Failed to listen to profile", e);
+                selectedAlertCategories.clear();
+                selectedAlertCategories.addAll(AircraftCategory.getDefaultAlertCategories());
             }
         });
     }
-
 }

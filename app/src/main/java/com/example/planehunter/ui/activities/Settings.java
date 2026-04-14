@@ -2,30 +2,31 @@ package com.example.planehunter.ui.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.planehunter.R;
-import com.example.planehunter.model.UserProfile;
-
 import com.example.planehunter.data.firebase.FirebaseHandler;
+import com.example.planehunter.model.AircraftCategory;
+import com.example.planehunter.model.UserProfile;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.checkbox.MaterialCheckBox;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
 
 public class Settings extends AppCompatActivity {
 
     private MaterialButton btnSelectAll;
     private MaterialButton btnClearAll;
     private MaterialButton btnSave;
-    private Map<Integer,MaterialCheckBox> categoryCheckboxes;
+    private Map<Long, MaterialCheckBox> categoryCheckboxes;
 
-    FirebaseHandler firebaseHandler;
+    private FirebaseHandler firebaseHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,91 +38,92 @@ public class Settings extends AppCompatActivity {
 
         firebaseHandler.getMyProfile()
                 .addOnSuccessListener(profile -> {
+                    List<Long> categories;
 
-                    if (profile == null){ return;}
-
-                    List<Long> categories = profile.getAlertCategories();
-
-                    if (categories == null) {
-                        categories = UserProfile.getDefaultCategories();
+                    if (profile == null) {
+                        categories = AircraftCategory.getDefaultAlertCategories();
+                    } else {
+                        categories = AircraftCategory.normalizeAlertCategories(profile.getAlertCategories());
                     }
 
                     setSelected(categories);
                 });
-
     }
 
     private void setSelected(List<Long> categories) {
-
-        //unselect everything
         for (MaterialCheckBox cb : categoryCheckboxes.values()) {
             cb.setChecked(false);
         }
 
-        //set selected
         for (Long category : categories) {
-            MaterialCheckBox cb = categoryCheckboxes.get(category.intValue());
+            MaterialCheckBox cb = categoryCheckboxes.get(category);
             if (cb != null) {
                 cb.setChecked(true);
             }
         }
-
     }
 
-
-    public void init(){
-
+    private void init() {
         firebaseHandler = FirebaseHandler.getInstance();
 
         btnSelectAll = findViewById(R.id.buttonSelectAll);
         btnClearAll = findViewById(R.id.buttonClearAll);
         btnSave = findViewById(R.id.buttonSave);
 
-        categoryCheckboxes = new java.util.HashMap<>();
+        categoryCheckboxes = new LinkedHashMap<>();
 
-        categoryCheckboxes.put(1, findViewById(R.id.checkCategory1));
-        categoryCheckboxes.put(2, findViewById(R.id.checkCategory2));
-        categoryCheckboxes.put(3, findViewById(R.id.checkCategory3));
-        categoryCheckboxes.put(4, findViewById(R.id.checkCategory4));
-        categoryCheckboxes.put(5, findViewById(R.id.checkCategory5));
-        categoryCheckboxes.put(6, findViewById(R.id.checkCategory6));
-        categoryCheckboxes.put(7, findViewById(R.id.checkCategory7));
-        categoryCheckboxes.put(8, findViewById(R.id.checkCategory8));
-        categoryCheckboxes.put(9, findViewById(R.id.checkCategory9));
-        categoryCheckboxes.put(10, findViewById(R.id.checkCategory10));
-        categoryCheckboxes.put(11, findViewById(R.id.checkCategory11));
-        categoryCheckboxes.put(12, findViewById(R.id.checkCategory12));
-        categoryCheckboxes.put(13, findViewById(R.id.checkCategory13));
-        categoryCheckboxes.put(14, findViewById(R.id.checkCategory14));
-        categoryCheckboxes.put(15, findViewById(R.id.checkCategory15));
-        categoryCheckboxes.put(16, findViewById(R.id.checkCategory16));
-        categoryCheckboxes.put(17, findViewById(R.id.checkCategory17));
-        categoryCheckboxes.put(18, findViewById(R.id.checkCategory18));
-        categoryCheckboxes.put(19, findViewById(R.id.checkCategory19));
-        categoryCheckboxes.put(20, findViewById(R.id.checkCategory20));
+        MaterialCheckBox check1 = findViewById(R.id.checkCategory1);
+        MaterialCheckBox check2 = findViewById(R.id.checkCategory2);
+        MaterialCheckBox check3 = findViewById(R.id.checkCategory3);
+        MaterialCheckBox check4 = findViewById(R.id.checkCategory4);
+        MaterialCheckBox check5 = findViewById(R.id.checkCategory5);
+        MaterialCheckBox check6 = findViewById(R.id.checkCategory6);
+        MaterialCheckBox check7 = findViewById(R.id.checkCategory7);
+
+        check1.setText(AircraftCategory.getDisplayName(AircraftCategory.AIRLINER));
+        check2.setText(AircraftCategory.getDisplayName(AircraftCategory.CARGO));
+        check3.setText(AircraftCategory.getDisplayName(AircraftCategory.BUSINESS_JET));
+        check4.setText(AircraftCategory.getDisplayName(AircraftCategory.GENERAL_AVIATION));
+        check5.setText(AircraftCategory.getDisplayName(AircraftCategory.TURBOPROP_REGIONAL));
+        check6.setText(AircraftCategory.getDisplayName(AircraftCategory.HELICOPTER));
+        check7.setText(AircraftCategory.getDisplayName(AircraftCategory.MILITARY_GOVERNMENT));
+
+        categoryCheckboxes.put(AircraftCategory.AIRLINER, check1);
+        categoryCheckboxes.put(AircraftCategory.CARGO, check2);
+        categoryCheckboxes.put(AircraftCategory.BUSINESS_JET, check3);
+        categoryCheckboxes.put(AircraftCategory.GENERAL_AVIATION, check4);
+        categoryCheckboxes.put(AircraftCategory.TURBOPROP_REGIONAL, check5);
+        categoryCheckboxes.put(AircraftCategory.HELICOPTER, check6);
+        categoryCheckboxes.put(AircraftCategory.MILITARY_GOVERNMENT, check7);
 
 
-        btnSave.setOnClickListener(v ->{
+        btnSave.setOnClickListener(v -> {
             ArrayList<Long> result = new ArrayList<>();
 
-            for (Map.Entry<Integer,MaterialCheckBox> entry:categoryCheckboxes.entrySet()) {
-                if(entry.getValue().isChecked()){
-                    result.add(Long.valueOf(entry.getKey()));
+            for (Map.Entry<Long, MaterialCheckBox> entry : categoryCheckboxes.entrySet()) {
+                if (entry.getValue().isChecked()) {
+                    result.add(entry.getKey());
                 }
             }
+
+            if (result.isEmpty()) {
+                result = AircraftCategory.getDefaultAlertCategories();
+            }
+
             firebaseHandler.updateAlertCategories(result);
 
             Intent intent = new Intent(this, MainActivity.class);
             startActivity(intent);
+            finish();
         });
 
-        btnSelectAll.setOnClickListener(v->{
+        btnSelectAll.setOnClickListener(v -> {
             for (MaterialCheckBox cb : categoryCheckboxes.values()) {
                 cb.setChecked(true);
             }
         });
 
-        btnClearAll.setOnClickListener(v->{
+        btnClearAll.setOnClickListener(v -> {
             for (MaterialCheckBox cb : categoryCheckboxes.values()) {
                 cb.setChecked(false);
             }

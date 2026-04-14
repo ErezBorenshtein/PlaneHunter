@@ -81,7 +81,7 @@
             android:id="@+id/checkCategory1"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="1 - No ADS-B Emitter Category Information"
+            android:text="Airliner"
             app:layout_constraintTop_toBottomOf="@id/textCategoriesHeader"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -91,7 +91,7 @@
             android:id="@+id/checkCategory2"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="2 - Light (&lt; 15500 lbs)"
+            android:text="Cargo"
             app:layout_constraintTop_toBottomOf="@id/checkCategory1"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -101,7 +101,7 @@
             android:id="@+id/checkCategory3"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="3 - Small (15500 to 75000 lbs)"
+            android:text="Buisiness Jet"
             app:layout_constraintTop_toBottomOf="@id/checkCategory2"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -111,7 +111,7 @@
             android:id="@+id/checkCategory4"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="4 - Large (75000 to 300000 lbs)"
+            android:text="General Aviation"
             app:layout_constraintTop_toBottomOf="@id/checkCategory3"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -121,7 +121,7 @@
             android:id="@+id/checkCategory5"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="5 - High Vortex Large (e.g. B-757)"
+            android:text="TurboProp Regional"
             app:layout_constraintTop_toBottomOf="@id/checkCategory4"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -131,7 +131,7 @@
             android:id="@+id/checkCategory6"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="6 - Heavy (&gt; 300000 lbs)"
+            android:text="Helicopter"
             app:layout_constraintTop_toBottomOf="@id/checkCategory5"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -141,140 +141,11 @@
             android:id="@+id/checkCategory7"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="7 - High Performance (&gt; 5g acceleration and 400 kts)"
+            android:text="Military / Government"
             app:layout_constraintTop_toBottomOf="@id/checkCategory6"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Category 8 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory8"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="8 - Rotorcraft"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory7"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 9 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory9"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="9 - Glider / sailplane"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory8"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 10 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory10"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="10 - Lighter-than-air"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory9"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 11 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory11"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="11 - Parachutist / Skydiver"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory10"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 12 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory12"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="12 - Ultralight / hang-glider / paraglider"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory11"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 13 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory13"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="13 - Reserved"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory12"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 14 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory14"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="14 - Unmanned Aerial Vehicle"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory13"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 15 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory15"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="15 - Space / Trans-atmospheric vehicle"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory14"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 16 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory16"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="16 - Surface Vehicle - Emergency Vehicle"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory15"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 17 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory17"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="17 - Surface Vehicle - Service Vehicle"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory16"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 18 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory18"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="18 - Point Obstacle (includes tethered balloons)"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory17"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 19 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory19"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="19 - Cluster Obstacle"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory18"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <!-- Category 20 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory20"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="20 - Line Obstacle"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory19"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonSave"
@@ -283,7 +154,7 @@
             android:layout_marginTop="24dp"
             android:layout_marginBottom="24dp"
             android:text="Save"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory20"
+            app:layout_constraintTop_toBottomOf="@id/checkCategory7"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
