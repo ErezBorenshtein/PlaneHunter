@@ -240,7 +240,7 @@ public class OpenSkyFetcher {
     }
 
     private void postResult(PlanesCallback callback, ArrayList<Plane> planes) {
-        //posts the callback to the main thread so the result can update the UI.
+        //posts the callback to the main thread so the result can update the UI
         new Handler(Looper.getMainLooper()).post(() -> callback.onPlanesFetched(planes));
     }
 

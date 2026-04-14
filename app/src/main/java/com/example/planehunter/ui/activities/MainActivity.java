@@ -113,9 +113,9 @@ public class MainActivity extends AppCompatActivity {
         setupRadar();
         setupButtons();
 
-        // Temporary
-        radarView.setRadarRangeMeters(300_000.0); // 300 km
-        // radarView.setRadarRangeMeters(100_000.0); // 100 km
+        //! Temporary
+        //radarView.setRadarRangeMeters(300_000.0); // 300 km
+         radarView.setRadarRangeMeters(150_000.0); // 100 km
     }
 
     @Override
