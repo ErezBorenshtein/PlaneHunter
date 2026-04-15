@@ -11,7 +11,9 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import androidx.annotation.Nullable;
@@ -19,6 +21,7 @@ import androidx.annotation.Nullable;
 import com.example.planehunter.model.Plane;
 import com.example.planehunter.R;
 import com.example.planehunter.util.UtilMath;
+import com.example.planehunter.model.AircraftCategory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,9 +61,10 @@ public class RadarView extends View {
     private double radarRangeMeters = 30000.0; //default 30km
     private float meRadiusPx = 14f;
 
-    private Bitmap planeOriginalBitmap;
-    private Bitmap planeScaledBitmap;
-    private int planeIconSizePx = 56;
+    private final Map<Long, Bitmap> categoryBitmaps = new HashMap<>();
+    private Bitmap fallbackBitmap;
+
+    private int planeIconSizePx = 100;
 
     private OnPlaneClickListener listener;
 
@@ -100,8 +104,35 @@ public class RadarView extends View {
         paintPlaneCooldown.setColorFilter(new ColorMatrixColorFilter(matrix));
         paintPlaneCooldown.setAlpha(120);
 
-        planeOriginalBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.air_plan);
-        planeScaledBitmap = scalePlaneBitmap(planeOriginalBitmap, planeIconSizePx);
+        loadCategoryBitmap();
+    }
+
+    private void loadCategoryBitmap() {
+        categoryBitmaps.clear();
+
+        categoryBitmaps.put(AircraftCategory.AIRLINER, loadScaledBitmap(R.drawable.plane_airliner));
+        categoryBitmaps.put(AircraftCategory.CARGO, loadScaledBitmap(R.drawable.plane_cargo));
+        categoryBitmaps.put(AircraftCategory.BUSINESS_JET, loadScaledBitmap(R.drawable.plane_business_jet));
+        categoryBitmaps.put(AircraftCategory.GENERAL_AVIATION, loadScaledBitmap(R.drawable.plane_turboprop));
+        categoryBitmaps.put(AircraftCategory.TURBOPROP_REGIONAL, loadScaledBitmap(R.drawable.plane_turboprop));
+        categoryBitmaps.put(AircraftCategory.HELICOPTER, loadScaledBitmap(R.drawable.plane_helicopter));
+        categoryBitmaps.put(AircraftCategory.MILITARY_GOVERNMENT, loadScaledBitmap(R.drawable.plane_military));
+        categoryBitmaps.put(AircraftCategory.UNKNOWN, loadScaledBitmap(R.drawable.plane_turboprop));
+
+        fallbackBitmap = categoryBitmaps.get(AircraftCategory.UNKNOWN);
+    }
+
+    private Bitmap loadScaledBitmap(int drawableResId) {
+        Bitmap originalBitmap = BitmapFactory.decodeResource(getResources(), drawableResId);
+        return scalePlaneBitmap(originalBitmap, planeIconSizePx);
+    }
+
+    private Bitmap getBitmapForPlane(Plane plane){
+        if(plane == null) return fallbackBitmap;
+
+        Bitmap bitmap = categoryBitmaps.get(plane.getCategory());
+        if(bitmap != null) return bitmap;
+        return fallbackBitmap;
     }
 
     public void setOnPlaneClickListener(OnPlaneClickListener l) {
@@ -193,13 +224,14 @@ public class RadarView extends View {
         //me in center
         canvas.drawCircle(centerX, centerY, meRadiusPx, paintMe);
 
-        Bitmap bitmap = planeScaledBitmap;
-        if (bitmap == null) return;
-
-        float half = bitmap.getWidth() / 2f;
 
         synchronized (lock) {
+
             for (Blip blip : blips) {
+
+                Bitmap bitmap = getBitmapForPlane(blip.plane);
+                float half = bitmap.getWidth() / 2f;
+
                 canvas.save();
                 canvas.translate(blip.x, blip.y); //moves canvas center to plane center
                 canvas.rotate(blip.rotDeg);
@@ -336,8 +368,9 @@ public class RadarView extends View {
                 b.rotDeg = 0f; // unknown
             }
 
-            int iconSize = (planeScaledBitmap != null) ? planeScaledBitmap.getWidth() : planeIconSizePx;
-            b.hitR = Math.max(18f, iconSize * 0.65f); //so icon wont be too small
+            Bitmap bitmap = getBitmapForPlane(p);
+            int iconSize =bitmap.getWidth();
+            b.hitR = Math.max(18f,iconSize*0.65f);
 
             newBlips.add(b);
         }
@@ -425,7 +458,24 @@ public class RadarView extends View {
 
     private Bitmap scalePlaneBitmap(Bitmap src, int targetPx) {
         if (src == null) return null;
-        int t = Math.max(16, targetPx);
-        return Bitmap.createScaledBitmap(src, t, t, true);
+
+        int target = Math.max(16, targetPx);
+
+        int srcWidth = src.getWidth();
+        int srcHeight = src.getHeight();
+
+        if (srcWidth <= 0 || srcHeight <= 0) {
+            return src;
+        }
+
+        float scale = Math.min(
+                (float) target / srcWidth,
+                (float) target / srcHeight
+        );
+
+        int scaledWidth = Math.max(1, Math.round(srcWidth * scale));
+        int scaledHeight = Math.max(1, Math.round(srcHeight * scale));
+
+        return Bitmap.createScaledBitmap(src, scaledWidth, scaledHeight, true);
     }
 }

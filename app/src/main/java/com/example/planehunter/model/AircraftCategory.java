@@ -3,6 +3,8 @@ package com.example.planehunter.model;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.example.planehunter.R;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -93,5 +95,16 @@ public final class AircraftCategory {
 		if (category == HELICOPTER) return "Helicopter";
 		if (category == MILITARY_GOVERNMENT) return "Military / Government";
 		return "Unknown";
+	}
+
+	public static int getImageResId(long category) {
+		if (category == AIRLINER) return R.drawable.plane_airliner;
+		if (category == CARGO) return R.drawable.plane_cargo;
+		if (category == BUSINESS_JET) return R.drawable.plane_business_jet;
+		if (category == GENERAL_AVIATION) return R.drawable.plane_turboprop;
+		if (category == TURBOPROP_REGIONAL) return R.drawable.plane_turboprop;
+		if (category == HELICOPTER) return R.drawable.plane_helicopter;
+		if (category == MILITARY_GOVERNMENT) return R.drawable.plane_military;
+		return R.drawable.air_plan;
 	}
 }
