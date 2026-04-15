@@ -2,7 +2,6 @@ package com.example.planehunter.ui.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -10,12 +9,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.planehunter.R;
 import com.example.planehunter.data.firebase.FirebaseHandler;
 import com.example.planehunter.model.AircraftCategory;
-import com.example.planehunter.model.UserProfile;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.checkbox.MaterialCheckBox;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -70,7 +68,7 @@ public class Settings extends AppCompatActivity {
         btnClearAll = findViewById(R.id.buttonClearAll);
         btnSave = findViewById(R.id.buttonSave);
 
-        categoryCheckboxes = new LinkedHashMap<>();
+        categoryCheckboxes = new HashMap<>();
 
         MaterialCheckBox check1 = findViewById(R.id.checkCategory1);
         MaterialCheckBox check2 = findViewById(R.id.checkCategory2);
@@ -79,14 +77,6 @@ public class Settings extends AppCompatActivity {
         MaterialCheckBox check5 = findViewById(R.id.checkCategory5);
         MaterialCheckBox check6 = findViewById(R.id.checkCategory6);
         MaterialCheckBox check7 = findViewById(R.id.checkCategory7);
-
-        check1.setText(AircraftCategory.getDisplayName(AircraftCategory.AIRLINER));
-        check2.setText(AircraftCategory.getDisplayName(AircraftCategory.CARGO));
-        check3.setText(AircraftCategory.getDisplayName(AircraftCategory.BUSINESS_JET));
-        check4.setText(AircraftCategory.getDisplayName(AircraftCategory.GENERAL_AVIATION));
-        check5.setText(AircraftCategory.getDisplayName(AircraftCategory.TURBOPROP_REGIONAL));
-        check6.setText(AircraftCategory.getDisplayName(AircraftCategory.HELICOPTER));
-        check7.setText(AircraftCategory.getDisplayName(AircraftCategory.MILITARY_GOVERNMENT));
 
         categoryCheckboxes.put(AircraftCategory.AIRLINER, check1);
         categoryCheckboxes.put(AircraftCategory.CARGO, check2);

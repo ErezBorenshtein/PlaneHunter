@@ -65,6 +65,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         skyLinkFetcher = new SkyLinkFetcher(requireContext().getApplicationContext(), getString(R.string.skylink_key));
 
         ImageView imgPlane = v.findViewById(R.id.imgPlane);
+        ImageView countryFlagImg = v.findViewById(R.id.imgFlag);
         ProgressBar progPlane = v.findViewById(R.id.progPlane);
         TextView tvRegistration = v.findViewById(R.id.tvRegistration);
         TextView tvTypeName = v.findViewById(R.id.tvTypeName);
@@ -75,6 +76,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         isLoadingAircraftInfo = shouldLoadAircraftInfo();
         bindBasicDetails(tvRegistration, tvTypeName, tvAltitude, tvHeading);
         loadPlanePhoto(imgPlane, progPlane);
+        loadFlagImage(countryFlagImg, plane.getCountryCode());
 
         btnCapture.setOnClickListener(view -> {
             if (listener != null && plane != null) {
@@ -166,7 +168,7 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         }
 
         if (!isBlank(plane.getPhotoUrl())) {
-            loadImageUrl(img, prog, plane.getPhotoUrl());
+            loadPlaneImageUrl(img, prog, plane.getPhotoUrl());
             return;
         }
 
@@ -194,11 +196,23 @@ public class PlaneSheet extends BottomSheetDialogFragment {
                 return;
             }
 
-            loadImageUrl(img, prog, plane.getPhotoUrl());
+            loadPlaneImageUrl(img, prog, plane.getPhotoUrl());
         });
     }
 
-    private void loadImageUrl(ImageView img, ProgressBar prog, String url) {
+    private void loadFlagImage(ImageView countryFlagImg, String countryCode){
+        if (countryCode == null) {
+            return;
+        }
+
+        String flagUrl = "https://flagcdn.com/w80/" + countryCode.toLowerCase() + ".png";
+
+        Glide.with(this)
+                .load(flagUrl)
+                .into(countryFlagImg);
+    }
+
+    private void loadPlaneImageUrl(ImageView img, ProgressBar prog, String url) {
         prog.setVisibility(View.VISIBLE);
 
         Glide.with(this)

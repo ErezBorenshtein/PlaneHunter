@@ -42,7 +42,7 @@ public class SkyLinkFetcher {
 
     private final Object cacheLock = new Object();
 
-    private final Map<String, AircraftMetadata> memoryCache = new HashMap<>();
+    private final Map<String, AircraftData> memoryCache = new HashMap<>();
     private final Set<String> negativeCache = new HashSet<>();
     private final Set<String> inFlight = new HashSet<>();
 
@@ -72,9 +72,9 @@ public class SkyLinkFetcher {
                         continue;
                     }
 
-                    applyCachedMetadataToPlane(plane);
+                    applyCachedDataToPlane(plane);
 
-                    if (!needsMetadataForClassification(plane)) {
+                    if (!needsdataForClassification(plane)) {
                         continue;
                     }
 
@@ -95,18 +95,18 @@ public class SkyLinkFetcher {
                         continue;
                     }
 
-                    AircraftMetadata metadata = fetchMetadataSync(icao, false);
+                    AircraftData data = fetchDataSync(icao, false);
                     lookedUpNow.add(icao);
                     lookupsDone++;
 
-                    if (metadata != null) {
-                        applyMetadataToPlane(plane, metadata);
+                    if (data != null) {
+                        applyDataToPlane(plane, data);
                     }
                 }
 
                 for (Plane plane : planes) {
                     if (plane != null) {
-                        applyCachedMetadataToPlane(plane);
+                        applyCachedDataToPlane(plane);
                     }
                 }
 
@@ -122,17 +122,17 @@ public class SkyLinkFetcher {
         new Thread(() -> {
             try {
                 if (plane != null) {
-                    applyCachedMetadataToPlane(plane);
+                    applyCachedDataToPlane(plane);
 
                     String icao = normalizeIcao(plane.getIcao24());
                     if (icao != null && !isInNegativeCache(icao)) {
                         boolean includePhoto = isBlank(plane.getPhotoUrl());
-                        boolean needMetadata = needsMetadataForSheet(plane);
+                        boolean needdata = needsdataForSheet(plane);
 
-                        if (needMetadata || includePhoto) {
-                            AircraftMetadata metadata = fetchMetadataSync(icao, includePhoto);
-                            if (metadata != null) {
-                                applyMetadataToPlane(plane, metadata);
+                        if (needdata || includePhoto) {
+                            AircraftData data = fetchDataSync(icao, includePhoto);
+                            if (data != null) {
+                                applyDataToPlane(plane, data);
                             }
                         }
                     }
@@ -149,37 +149,37 @@ public class SkyLinkFetcher {
         mainHandler.post(callback::onDone);
     }
 
-    private boolean needsMetadataForClassification(@NonNull Plane plane) {
+    private boolean needsdataForClassification(@NonNull Plane plane) {
         return plane.getCategory() == AircraftCategory.UNKNOWN
                 || isBlank(plane.getTypeCode())
                 || isBlank(plane.getTypeName());
     }
 
-    private boolean needsMetadataForSheet(@NonNull Plane plane) {
+    private boolean needsdataForSheet(@NonNull Plane plane) {
         return isBlank(plane.getRegistration())
                 || isBlank(plane.getTypeCode())
                 || isBlank(plane.getTypeName())
                 || plane.getCategory() == AircraftCategory.UNKNOWN;
     }
 
-    private void applyCachedMetadataToPlane(@NonNull Plane plane) {
+    private void applyCachedDataToPlane(@NonNull Plane plane) {
         String icao = normalizeIcao(plane.getIcao24());
         if (icao == null) {
             ensureCategory(plane);
             return;
         }
 
-        AircraftMetadata metadata = getMemoryCacheEntry(icao);
+        AircraftData data = getMemoryCacheEntry(icao);
 
-        if (metadata == null) {
-            metadata = readMetadataFromPrefs(icao);
-            if (metadata != null) {
-                putMemoryCacheEntry(icao, metadata);
+        if (data == null) {
+            data = readDataFromPrefs(icao);
+            if (data != null) {
+                putMemoryCacheEntry(icao, data);
             }
         }
 
-        if (metadata != null) {
-            applyMetadataToPlane(plane, metadata);
+        if (data != null) {
+            applyDataToPlane(plane, data);
             return;
         }
 
@@ -187,13 +187,13 @@ public class SkyLinkFetcher {
     }
 
     @Nullable
-    private AircraftMetadata fetchMetadataSync(@NonNull String icao, boolean includePhoto) {
-        AircraftMetadata cached = getMemoryCacheEntry(icao);
+    private AircraftData fetchDataSync(@NonNull String icao, boolean includePhoto) {
+        AircraftData cached = getMemoryCacheEntry(icao);
         if (cached != null && (!includePhoto || !isBlank(cached.photoUrl))) {
             return cached;
         }
 
-        AircraftMetadata cachedFromPrefs = readMetadataFromPrefs(icao);
+        AircraftData cachedFromPrefs = readDataFromPrefs(icao);
         if (cachedFromPrefs != null) {
             putMemoryCacheEntry(icao, cachedFromPrefs);
 
@@ -236,18 +236,18 @@ public class SkyLinkFetcher {
                 return cachedFromPrefs;
             }
 
-            AircraftMetadata metadata = parseMetadata(body);
-            if (metadata == null) {
+            AircraftData data = parseData(body);
+            if (data == null) {
                 addToNegativeCache(icao);
                 return cachedFromPrefs;
             }
 
-            putMemoryCacheEntry(icao, metadata);
-            writeMetadataToPrefs(icao, metadata);
-            return metadata;
+            putMemoryCacheEntry(icao, data);
+            writeDataToPrefs(icao, data);
+            return data;
 
         } catch (Exception e) {
-            Log.e(TAG, "fetchMetadataSync failed for " + icao, e);
+            Log.e(TAG, "fetchDataSync failed for " + icao, e);
             return cachedFromPrefs;
         } finally {
             clearInFlight(icao);
@@ -259,7 +259,7 @@ public class SkyLinkFetcher {
     }
 
     @Nullable
-    private AircraftMetadata parseMetadata(@Nullable String json) {
+    private AircraftData parseData(@Nullable String json) {
         if (json == null || json.trim().isEmpty()) {
             return null;
         }
@@ -276,25 +276,25 @@ public class SkyLinkFetcher {
                 return null;
             }
 
-            AircraftMetadata metadata = new AircraftMetadata();
-            metadata.registration = trimToNull(aircraft.optString("registration", null));
-            metadata.typeCode = trimToNull(aircraft.optString("icao_type", null));
-            metadata.typeName = trimToNull(aircraft.optString("type_name", null));
-            metadata.ownerOperator = trimToNull(aircraft.optString("owner_operator", null));
-            metadata.isMilitary = aircraft.optBoolean("is_military", false);
-            metadata.photoUrl = extractPhotoUrl(aircraft);
+            AircraftData data = new AircraftData();
+            data.registration = trimToNull(aircraft.optString("registration", null));
+            data.typeCode = trimToNull(aircraft.optString("icao_type", null));
+            data.typeName = trimToNull(aircraft.optString("type_name", null));
+            data.ownerOperator = trimToNull(aircraft.optString("owner_operator", null));
+            data.isMilitary = aircraft.optBoolean("is_military", false);
+            data.photoUrl = extractPhotoUrl(aircraft);
 
-            metadata.category = AircraftCategoryClassifier.classify(
-                    metadata.typeCode,
-                    metadata.typeName,
-                    metadata.ownerOperator,
-                    metadata.isMilitary
+            data.category = AircraftCategoryClassifier.classify(
+                    data.typeCode,
+                    data.typeName,
+                    data.ownerOperator,
+                    data.isMilitary
             );
 
-            return metadata;
+            return data;
 
         } catch (Exception e) {
-            Log.e(TAG, "parseMetadata failed", e);
+            Log.e(TAG, "parsedata failed", e);
             return null;
         }
     }
@@ -324,31 +324,31 @@ public class SkyLinkFetcher {
         return trimToNull(firstPhoto.optString("link", null));
     }
 
-    private void applyMetadataToPlane(@NonNull Plane plane, @NonNull AircraftMetadata metadata) {
-        if (!isBlank(metadata.registration)) {
-            plane.setRegistration(metadata.registration);
+    private void applyDataToPlane(@NonNull Plane plane, @NonNull AircraftData data) {
+        if (!isBlank(data.registration)) {
+            plane.setRegistration(data.registration);
         }
 
-        if (!isBlank(metadata.typeCode)) {
-            plane.setTypeCode(metadata.typeCode);
+        if (!isBlank(data.typeCode)) {
+            plane.setTypeCode(data.typeCode);
         }
 
-        if (!isBlank(metadata.typeName)) {
-            plane.setTypeName(metadata.typeName);
+        if (!isBlank(data.typeName)) {
+            plane.setTypeName(data.typeName);
         }
 
-        if (!isBlank(metadata.ownerOperator)) {
-            plane.setOwnerOperator(metadata.ownerOperator);
+        if (!isBlank(data.ownerOperator)) {
+            plane.setOwnerOperator(data.ownerOperator);
         }
 
-        if (!isBlank(metadata.photoUrl)) {
-            plane.setPhotoUrl(metadata.photoUrl);
+        if (!isBlank(data.photoUrl)) {
+            plane.setPhotoUrl(data.photoUrl);
         }
 
-        plane.setMilitary(metadata.isMilitary);
+        plane.setMilitary(data.isMilitary);
 
-        if (metadata.category != AircraftCategory.UNKNOWN) {
-            plane.setCategory(metadata.category);
+        if (data.category != AircraftCategory.UNKNOWN) {
+            plane.setCategory(data.category);
         } else {
             ensureCategory(plane);
         }
@@ -366,7 +366,7 @@ public class SkyLinkFetcher {
     }
 
     @Nullable
-    private AircraftMetadata readMetadataFromPrefs(@NonNull String icao) {
+    private AircraftData readDataFromPrefs(@NonNull String icao) {
         try {
             String json = prefs.getString(PREF_KEY_PREFIX + icao, null);
             if (json == null || json.trim().isEmpty()) {
@@ -375,40 +375,40 @@ public class SkyLinkFetcher {
 
             JSONObject obj = new JSONObject(json);
 
-            AircraftMetadata metadata = new AircraftMetadata();
-            metadata.registration = trimToNull(obj.optString("registration", null));
-            metadata.typeCode = trimToNull(obj.optString("typeCode", null));
-            metadata.typeName = trimToNull(obj.optString("typeName", null));
-            metadata.ownerOperator = trimToNull(obj.optString("ownerOperator", null));
-            metadata.photoUrl = trimToNull(obj.optString("photoUrl", null));
-            metadata.isMilitary = obj.optBoolean("isMilitary", false);
-            metadata.category = obj.optLong("category", AircraftCategory.UNKNOWN);
+            AircraftData data = new AircraftData();
+            data.registration = trimToNull(obj.optString("registration", null));
+            data.typeCode = trimToNull(obj.optString("typeCode", null));
+            data.typeName = trimToNull(obj.optString("typeName", null));
+            data.ownerOperator = trimToNull(obj.optString("ownerOperator", null));
+            data.photoUrl = trimToNull(obj.optString("photoUrl", null));
+            data.isMilitary = obj.optBoolean("isMilitary", false);
+            data.category = obj.optLong("category", AircraftCategory.UNKNOWN);
 
-            return metadata;
+            return data;
 
         } catch (Exception e) {
-            Log.e(TAG, "readMetadataFromPrefs failed for " + icao, e);
+            Log.e(TAG, "readdataFromPrefs failed for " + icao, e);
             return null;
         }
     }
 
-    private void writeMetadataToPrefs(@NonNull String icao, @NonNull AircraftMetadata metadata) {
+    private void writeDataToPrefs(@NonNull String icao, @NonNull AircraftData data) {
         try {
             JSONObject obj = new JSONObject();
-            obj.put("registration", metadata.registration);
-            obj.put("typeCode", metadata.typeCode);
-            obj.put("typeName", metadata.typeName);
-            obj.put("ownerOperator", metadata.ownerOperator);
-            obj.put("photoUrl", metadata.photoUrl);
-            obj.put("isMilitary", metadata.isMilitary);
-            obj.put("category", metadata.category);
+            obj.put("registration", data.registration);
+            obj.put("typeCode", data.typeCode);
+            obj.put("typeName", data.typeName);
+            obj.put("ownerOperator", data.ownerOperator);
+            obj.put("photoUrl", data.photoUrl);
+            obj.put("isMilitary", data.isMilitary);
+            obj.put("category", data.category);
 
             prefs.edit()
                     .putString(PREF_KEY_PREFIX + icao, obj.toString())
                     .apply();
 
         } catch (Exception e) {
-            Log.e(TAG, "writeMetadataToPrefs failed for " + icao, e);
+            Log.e(TAG, "writedataToPrefs failed for " + icao, e);
         }
     }
 
@@ -459,15 +459,15 @@ public class SkyLinkFetcher {
     }
 
     @Nullable
-    private AircraftMetadata getMemoryCacheEntry(@NonNull String icao) {
+    private AircraftData getMemoryCacheEntry(@NonNull String icao) {
         synchronized (cacheLock) {
             return memoryCache.get(icao);
         }
     }
 
-    private void putMemoryCacheEntry(@NonNull String icao, @NonNull AircraftMetadata metadata) {
+    private void putMemoryCacheEntry(@NonNull String icao, @NonNull AircraftData data) {
         synchronized (cacheLock) {
-            memoryCache.put(icao, metadata);
+            memoryCache.put(icao, data);
         }
     }
 
@@ -500,7 +500,7 @@ public class SkyLinkFetcher {
         }
     }
 
-    private static class AircraftMetadata {
+    private static class AircraftData {
         String registration;
         String typeCode;
         String typeName;

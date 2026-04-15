@@ -1,69 +1,110 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
     android:padding="16dp">
+
+    <!-- Plane Image -->
+
+    <!-- Progress -->
 
     <ImageView
         android:id="@+id/imgPlane"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="220dp"
-        android:layout_marginBottom="12dp"
+        android:layout_marginTop="8dp"
         android:scaleType="fitCenter"
-        android:src="@drawable/plane_placeholder" />
+        android:src="@drawable/plane_placeholder"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <ProgressBar
         android:id="@+id/progPlane"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:visibility="gone" />
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/imgPlane"
+        app:layout_constraintBottom_toBottomOf="@id/imgPlane"
+        app:layout_constraintStart_toStartOf="@id/imgPlane"
+        app:layout_constraintEnd_toEndOf="@id/imgPlane" />
 
+    <!-- Drag Handle -->
     <View
+        android:id="@+id/dragHandle"
         android:layout_width="40dp"
         android:layout_height="4dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="12dp"
-        android:background="#33000000" />
+        android:background="#33000000"
+        android:layout_marginTop="12dp"
+        app:layout_constraintTop_toBottomOf="@id/imgPlane"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Flag -->
+    <ImageView
+        android:id="@+id/imgFlag"
+        android:layout_width="32dp"
+        android:layout_height="20dp"
+        android:scaleType="centerCrop"
+        android:layout_marginTop="12dp"
+        app:layout_constraintTop_toBottomOf="@id/dragHandle"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Registration -->
     <TextView
         android:id="@+id/tvRegistration"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Registration: Loading..."
         android:textSize="18sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:layout_marginStart="8dp"
+        app:layout_constraintStart_toEndOf="@id/imgFlag"
+        app:layout_constraintTop_toTopOf="@id/imgFlag"
+        app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Aircraft Type -->
     <TextView
         android:id="@+id/tvTypeName"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Aircraft: Loading..." />
+        android:text="Aircraft: Loading..."
+        android:layout_marginTop="8dp"
+        app:layout_constraintTop_toBottomOf="@id/imgFlag"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <!-- Altitude -->
+    <TextView
+        android:id="@+id/tvAltitude"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:orientation="vertical">
+        app:layout_constraintTop_toBottomOf="@id/tvTypeName"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-        <TextView
-            android:id="@+id/tvAltitude"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+    <!-- Heading -->
+    <TextView
+        android:id="@+id/tvHeading"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/tvAltitude"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-        <TextView
-            android:id="@+id/tvHeading"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
-
+    <!-- Capture Button -->
     <Button
         android:id="@+id/btnCapture"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:text="Capture"
         android:layout_marginTop="16dp"
-        android:text="Capture" />
+        app:layout_constraintTop_toBottomOf="@id/tvHeading"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

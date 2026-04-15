@@ -18,17 +18,9 @@ public class Plane implements Parcelable {
     public double trackDeg = Double.NaN;
     public long category = AircraftCategory.UNKNOWN;
     public boolean isMilitary = false;
+    public String countryCode;
 
-    public Plane(String icao24, String callSign, double lat, double lon, double altitude, double trackDeg) {
-        this.icao24 = icao24;
-        this.callSign = callSign;
-        this.lat = lat;
-        this.lon = lon;
-        this.altitude = altitude;
-        this.trackDeg = trackDeg;
-    }
-
-    public Plane(String icao24, String callSign, double lat, double lon, double altitude, String registration, double trackDeg, int category) {
+    public Plane(String icao24, String callSign, double lat, double lon, double altitude, String registration, double trackDeg, int category, String countryCode) {
         this.icao24 = icao24;
         this.callSign = callSign;
         this.lat = lat;
@@ -37,30 +29,7 @@ public class Plane implements Parcelable {
         this.registration = registration;
         this.trackDeg = trackDeg;
         this.category = category;
-    }
-
-    public Plane(
-            String icao24,
-            String callSign,
-            double lat,
-            double lon,
-            double altitude,
-            String registration,
-            String model,
-            String manufacturerName,
-            String typeCode,
-            double trackDeg,
-            String typeName
-    ) {
-        this.icao24 = icao24;
-        this.callSign = callSign;
-        this.lat = lat;
-        this.lon = lon;
-        this.altitude = altitude;
-        this.registration = registration;
-        this.typeCode = typeCode;
-        this.typeName = typeName;
-        this.trackDeg = trackDeg;
+        this.countryCode = countryCode;
     }
 
     protected Plane(Parcel in) {
@@ -77,6 +46,7 @@ public class Plane implements Parcelable {
         trackDeg = in.readDouble();
         category = in.readLong();
         isMilitary = in.readByte() != 0;
+        countryCode = in.readString();
     }
 
     public static final Creator<Plane> CREATOR = new Creator<Plane>() {
@@ -111,6 +81,7 @@ public class Plane implements Parcelable {
         dest.writeDouble(trackDeg);
         dest.writeLong(category);
         dest.writeByte((byte) (isMilitary ? 1 : 0)); //boolean doesn't work with all parcelable versions
+        dest.writeString(countryCode);
         //dest.writeBoolean(isMilitary);
     }
 
@@ -192,5 +163,13 @@ public class Plane implements Parcelable {
 
     public void setMilitary(boolean military) {
         isMilitary = military;
+    }
+
+    public String getCountryCode() {
+        return countryCode;
+    }
+
+    public void setCountryCode(String countryCode) {
+        this.countryCode = countryCode;
     }
 }

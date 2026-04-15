@@ -20,6 +20,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class OpenSkyFetcher {
 
@@ -97,6 +98,28 @@ public class OpenSkyFetcher {
                     return;
                 }
 
+                // ------------------------------------------------------------
+                // OpenSky API response format
+                //
+                // {
+                //   "time": 1710000000,
+                //   "states": [
+                //    ["4ca123","DLH123",...],
+                //    ["3c5abc","RYR55",...]
+                //  ]
+                // }
+                //
+                // Each aircraft is represented as an array.
+                // Important indices used below:
+                // 0 = icao24
+                // 1 = callsign
+                // 5 = longitude
+                // 6 = latitude
+                // 7 = altitude
+                // 8 = on_ground
+                // 10 = track
+                // ------------------------------------------------------------
+
                 JSONObject data = new JSONObject(body);
                 JSONArray states = data.optJSONArray("states");
 
@@ -106,24 +129,34 @@ public class OpenSkyFetcher {
                     for (int i = 0; i < states.length(); i++) {
                         JSONArray state = states.optJSONArray(i);
 
-                        if (state == null) continue;
+                        if (state == null){
+                            Log.d(TAG,"null state");
+                            continue;
+                        }
 
                         boolean onGround = state.optBoolean(8, false);
-                        if (onGround) continue;
+                        if (onGround){
+                            Log.d(TAG,"on ground");
+                            continue;
+                        }
 
                         double lon = state.optDouble(5, Double.NaN);
                         double lat = state.optDouble(6, Double.NaN);
                         if (Double.isNaN(lat) || Double.isNaN(lon)) continue;
 
                         double distanceKm = UtilMath.haversineMeters(latCenter, lonCenter, lat, lon) / 1000.0;
-                        if (distanceKm > radiusKm) continue;
+                        if (distanceKm > radiusKm){
+                            Log.d(TAG,"bigger than radius");
+                            continue;
+                        }
 
                         String icao = safe(state.optString(0, ""));
                         String callSign = safe(state.optString(1, "N/A"));
                         double altitude = state.optDouble(7, 0.0);
                         double trackDeg = state.optDouble(10, Double.NaN);
+                        String countryCode = getCountryCode(state.optString(2,"N/A"));
 
-                        Plane plane = new Plane(icao, callSign, lat, lon, altitude, null, trackDeg, (int) AircraftCategory.UNKNOWN);
+                        Plane plane = new Plane(icao, callSign, lat, lon, altitude, null, trackDeg, (int) AircraftCategory.UNKNOWN,countryCode);
                         plane.setCategory(AircraftCategory.UNKNOWN);
                         planes.add(plane);
                     }
@@ -137,6 +170,17 @@ public class OpenSkyFetcher {
 
             postResult(callback, planes);
         }).start();
+    }
+
+    private String getCountryCode(String countryName) {
+        //https://www.javamadesoeasy.com/2016/10/display-name-of-all-countries-with.html
+        for (String iso : Locale.getISOCountries()) {
+            Locale locale = new Locale("", iso);
+            if (locale.getDisplayCountry(Locale.ENGLISH).equalsIgnoreCase(countryName)) {
+                return iso;
+            }
+        }
+        return null;
     }
 
     private String getValidToken() {
