@@ -84,7 +84,7 @@ public class PlaneService extends Service {
         locationClient = LocationServices.getFusedLocationProviderClient(this);
 
         fetcher = new OpenSkyFetcher();
-        fetcher.setRadiusKm(300); //!Temporary
+        fetcher.setRadiusKm(200); //!Temporary
 
         String openSkyId = getString(R.string.opensky_client_id);
         String openSkySecret = getString(R.string.opensky_client_secret);

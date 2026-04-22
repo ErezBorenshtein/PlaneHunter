@@ -14,11 +14,11 @@ public class PlaneBroadcast {
     public static final String EXTRA_USER_LON = "user_lon";
 
     public static Intent buildPlanesUpdatedIntent(double userLat, double userLon, ArrayList<Plane> planes) {
-        Intent i = new Intent(ACTION_PLANES_UPDATED);
-        i.putExtra(EXTRA_USER_LAT, userLat);
-        i.putExtra(EXTRA_USER_LON, userLon);
-        i.putParcelableArrayListExtra(EXTRA_PLANES, planes);
-        return i;
+        Intent intent = new Intent(ACTION_PLANES_UPDATED);
+        intent.putExtra(EXTRA_USER_LAT, userLat);
+        intent.putExtra(EXTRA_USER_LON, userLon);
+        intent.putParcelableArrayListExtra(EXTRA_PLANES, planes);
+        return intent;
     }
 
     public static double getUserLat(Intent intent) {

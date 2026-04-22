@@ -26,7 +26,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -35,7 +34,6 @@ public class FirebaseHandler {
     private static volatile FirebaseHandler instance;
 
     private static final long CAPTURE_COOLDOWN_MS = 30L * 60L * 1000L;
-    //private static final long CAPTURE_COOLDOWN_MS = 0;
 
     private static final long XP_TIER_1 = 1000L;
     private static final long XP_TIER_2 = 1300L;
@@ -396,11 +394,29 @@ public class FirebaseHandler {
             );
         }
 
-        capture.registration = preferNonEmpty(capture.registration, plane.getRegistration());
-        capture.icao24 = preferNonEmpty(capture.icao24, plane.getIcao24());
-        capture.typeCode = preferNonEmpty(capture.typeCode, plane.getTypeCode());
-        capture.typeName = preferNonEmpty(capture.typeName, plane.getTypeName());
-        capture.callSign = preferNonEmpty(capture.callSign, plane.getCallSign());
+
+        String reg = plane.getRegistration();
+        if (reg != null && !reg.trim().isEmpty()) {
+            capture.registration = reg.trim();
+        }
+        String icao = plane.getIcao24();
+        if (icao != null && !icao.trim().isEmpty()) {
+            capture.icao24 = icao.trim();
+        }
+        String typeCode = plane.getTypeCode();
+        if (typeCode != null && !typeCode.trim().isEmpty()) {
+            capture.typeCode = typeCode.trim();
+        }
+
+        String typeName = plane.getTypeName();
+        if (typeName != null && !typeName.trim().isEmpty()) {
+            capture.typeName = typeName.trim();
+        }
+
+        String callSign = plane.getCallSign();
+        if (callSign != null && !callSign.trim().isEmpty()) {
+            capture.callSign = callSign.trim();
+        }
 
         if (capture.firstCaughtAtMs <= 0L) {
             capture.firstCaughtAtMs = now;
