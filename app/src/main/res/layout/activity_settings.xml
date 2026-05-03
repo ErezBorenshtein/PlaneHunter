@@ -3,12 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:background="#050A12">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp">
+        android:padding="20dp">
 
         <!-- Title -->
         <TextView
@@ -16,8 +17,9 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:text="Alert Settings"
-            android:textSize="24sp"
+            android:textSize="26sp"
             android:textStyle="bold"
+            android:textColor="#EAF6FF"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -27,134 +29,146 @@
             android:id="@+id/textSubtitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Choose which aircraft categories will trigger notifications."
+            android:layout_marginTop="6dp"
+            android:text="Choose which aircraft categories will trigger alerts"
             android:textSize="14sp"
+            android:textColor="#88AFC9"
             app:layout_constraintTop_toBottomOf="@id/textTitle"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-
-
         <!-- Quick actions -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonSelectAll"
-            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="18dp"
             android:layout_marginEnd="8dp"
             android:text="Select all"
+            android:textAllCaps="false"
+            android:textColor="#EAF6FF"
+            app:backgroundTint="#8020344A"
+            app:cornerRadius="14dp"
+            app:strokeColor="#66AEEBFF"
+            app:strokeWidth="1dp"
             app:layout_constraintTop_toBottomOf="@id/textSubtitle"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/buttonClearAll"
-            app:layout_constraintHorizontal_weight="1" />
+            app:layout_constraintEnd_toStartOf="@id/buttonClearAll" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonClearAll"
-            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="18dp"
             android:layout_marginStart="8dp"
-            android:text="Clear all"
+            android:text="Clear"
+            android:textAllCaps="false"
+            android:textColor="#EAF6FF"
+            app:backgroundTint="#803A1F2A"
+            app:cornerRadius="14dp"
+            app:strokeColor="#66FF8A8A"
+            app:strokeWidth="1dp"
             app:layout_constraintTop_toBottomOf="@id/textSubtitle"
             app:layout_constraintStart_toEndOf="@id/buttonSelectAll"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_weight="1" />
+            app:layout_constraintEnd_toEndOf="parent" />
 
         <!-- Categories header -->
         <TextView
             android:id="@+id/textCategoriesHeader"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Aircraft categories"
+            android:layout_marginTop="26dp"
+            android:text="Aircraft Categories"
             android:textSize="18sp"
             android:textStyle="bold"
+            android:textColor="#EAF6FF"
             app:layout_constraintTop_toBottomOf="@id/buttonSelectAll"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Category 1 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory1"
+        <!-- Categories container -->
+        <LinearLayout
+            android:id="@+id/categoriesContainer"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Airliner"
+            android:orientation="vertical"
+            android:layout_marginTop="12dp"
+            android:padding="16dp"
+            android:background="@drawable/bg_card"
             app:layout_constraintTop_toBottomOf="@id/textCategoriesHeader"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Category 2 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory2"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Cargo"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory1"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCategory1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Airliner"
+                android:textColor="#EAF6FF"
+                android:minHeight="48dp"/>
 
-        <!-- Category 3 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory3"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Buisiness Jet"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory2"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCategory2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cargo"
+                android:textColor="#EAF6FF"
+                android:minHeight="48dp"/>
 
-        <!-- Category 4 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory4"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="General Aviation"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory3"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCategory3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Business Jet"
+                android:textColor="#EAF6FF"
+                android:minHeight="48dp"/>
 
-        <!-- Category 5 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory5"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="TurboProp Regional"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory4"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCategory4"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="General Aviation"
+                android:textColor="#EAF6FF"
+                android:minHeight="48dp"/>
 
-        <!-- Category 6 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory6"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Helicopter"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory5"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCategory5"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Turboprop Regional"
+                android:textColor="#EAF6FF"
+                android:minHeight="48dp"/>
 
-        <!-- Category 7 -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkCategory7"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Military / Government"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory6"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCategory6"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Helicopter"
+                android:textColor="#EAF6FF"
+                android:minHeight="48dp"/>
 
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCategory7"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Military / Government"
+                android:textColor="#EAF6FF"
+                android:minHeight="48dp"/>
 
+        </LinearLayout>
+
+        <!-- Save button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonSave"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="54dp"
             android:layout_marginTop="24dp"
-            android:layout_marginBottom="24dp"
-            android:text="Save"
-            app:layout_constraintTop_toBottomOf="@id/checkCategory7"
+            android:text="Save Settings"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#1F6FEB"
+            app:cornerRadius="18dp"
+            app:layout_constraintTop_toBottomOf="@id/categoriesContainer"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />

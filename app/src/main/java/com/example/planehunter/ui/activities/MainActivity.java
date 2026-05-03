@@ -34,7 +34,7 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "PlaneHunterDebug";
-    private static final int REQUEST_CAPTURE_GAME = 2001;
+    private static final int REQUEST_CAPTURE_GAME = 1;
 
     private RadarView radarView;
     private Button btnLogout;
@@ -243,21 +243,31 @@ public class MainActivity extends AppCompatActivity {
         btnSettings = findViewById(R.id.btnSettings);
     }
 
+
     private void setupRadar() {
-        radarView.setOnPlaneClickListener(plane -> {
-            radarView.setSelectedPlane(plane);
+        radarView.setOnPlaneClickListener(new RadarView.OnPlaneClickListener() {
 
-            PlaneSheet sheet = PlaneSheet.newInstance(plane);
-            sheet.setListener(p -> {
-                pendingCapturePlane = p;
+            @Override
+            public void onPlaneClicked(Plane plane) {
+                adarView.setSelectedPlane(plane);
 
-                Intent i = new Intent(this, CaptureGameActivity.class);
-                i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
-                i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
-                startActivityForResult(i, REQUEST_CAPTURE_GAME);
-            });
+                PlaneSheet sheet = PlaneSheet.newInstance(plane);
+                sheet.setListener(p -> {
+                    pendingCapturePlane = p;
 
-            sheet.show(getSupportFragmentManager(), "plane_sheet");
+                    Intent i = new Intent(this, CaptureGameActivity.class);
+                    i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
+                    i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
+                    startActivityForResult(i, REQUEST_CAPTURE_GAME);
+                });
+
+                sheet.show(getSupportFragmentManager(), "plane_sheet");
+            }
+
+            @Override
+            public void onMultiplePlanesClicked(ArrayList<Plane> planes) {
+                showPlanesChooser(planes);
+            }
         });
     }
 

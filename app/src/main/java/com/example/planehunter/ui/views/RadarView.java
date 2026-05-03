@@ -30,6 +30,8 @@ public class RadarView extends View {
 
     public interface OnPlaneClickListener {
         void onPlaneClicked(Plane plane);
+
+        void onMultiplePlanesClicked(ArrayList<Plane> planes);
     }
 
     private static class Blip {
@@ -249,6 +251,7 @@ public class RadarView extends View {
         }
     }
 
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() != MotionEvent.ACTION_DOWN) return true;
@@ -256,20 +259,39 @@ public class RadarView extends View {
         float touchX = event.getX();
         float touchY = event.getY();
 
-        Plane hit = findHitPlane(touchX, touchY);
+        ArrayList<Plane> hits = findPlanesNearTap(touchX, touchY);
 
-        if (hit == null) {
+        if (hits.isEmpty()) {
             setSelectedPlane(""); // clear selection
             return true;
         }
 
-        setSelectedPlane(hit);
-
-        if (listener != null) {
-            listener.onPlaneClicked(hit);
+        if (hits.size() == 1) {
+            listener.onPlaneClicked(hits.get(0));
+        } else if (hits.size() > 1) {
+            listener.onMultiplePlanesClicked(hits);
         }
 
+
         return true;
+    }
+
+    private ArrayList<Plane> findPlanesNearTap(float tapX, float tapY) {
+        ArrayList<Plane> hits = new ArrayList<>();
+
+        synchronized (lock){
+            for (Blip blip : blips) {
+                float dx = tapX - blip.x;
+                float dy = tapY - blip.y;
+                float distance = (float) Math.sqrt(dx * dx + dy * dy);
+
+                if (distance <= blip.hitR) {
+                    hits.add(blip.plane);
+                }
+            }
+        }
+
+        return hits;
     }
 
     private Plane findHitPlane(float x, float y) {

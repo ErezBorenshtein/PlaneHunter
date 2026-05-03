@@ -1,80 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:background="#050A12"
     android:padding="16dp">
 
+    <!-- Title -->
     <TextView
         android:id="@+id/textTitle"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Leaderboard"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="#EAF6FF"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Recycler -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerLeaderboard"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginTop="12dp"
-        android:layout_weight="1" />
+        app:layout_constraintTop_toBottomOf="@id/textTitle"
+        app:layout_constraintBottom_toTopOf="@id/myRankCard"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
-        android:background="#CCCCCC" />
-
-    <TextView
-        android:id="@+id/textMyRankTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Your Rank"
-        android:textStyle="bold" />
-
+    <!-- Your Rank Card -->
     <LinearLayout
-        android:id="@+id/layoutMyRank"
-        android:layout_width="match_parent"
+        android:id="@+id/myRankCard"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="@drawable/bg_card"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- Title -->
         <TextView
-            android:id="@+id/textMyRank"
-            android:layout_width="40dp"
-            android:layout_height="wrap_content"
-            android:text="-"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/textMyName"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Player"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/textMyCaptures"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Captures: 0" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/textMyXp"
+            android:id="@+id/textMyRankTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="0 XP"
-            android:textStyle="bold" />
+            android:text="Your Rank"
+            android:textStyle="bold"
+            android:textColor="#EAF6FF"
+            android:textSize="16sp" />
+
+        <!-- Row -->
+        <LinearLayout
+            android:id="@+id/layoutMyRank"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="12dp"
+            android:gravity="center_vertical">
+
+            <!-- Rank -->
+            <TextView
+                android:id="@+id/textMyRank"
+                android:layout_width="48dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:textColor="#1F6FEB"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <!-- Name + captures -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/textMyName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Player"
+                    android:textColor="#EAF6FF"
+                    android:textStyle="bold"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/textMyCaptures"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Captures: 0"
+                    android:textColor="#88AFC9"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- XP -->
+            <TextView
+                android:id="@+id/textMyXp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 XP"
+                android:textColor="#FFD166"
+                android:textStyle="bold"
+                android:textSize="16sp" />
+        </LinearLayout>
+
     </LinearLayout>
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

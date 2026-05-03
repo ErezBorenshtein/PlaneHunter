@@ -43,7 +43,7 @@ public class NotificationHelper {
         return new NotificationCompat.Builder(ctx, CHANNEL_ID_FOREGROUND)
                 .setContentTitle(title)
                 .setContentText(text)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.forground_icon)
                 .setOngoing(true)
                 .build();
     }
@@ -65,7 +65,7 @@ public class NotificationHelper {
         );
 
         Notification notification = new  NotificationCompat.Builder(context,CHANNEL_ID_ALERTS)
-                .setSmallIcon(R.drawable.air_plan)
+                .setSmallIcon(R.drawable.plane_placeholder)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)

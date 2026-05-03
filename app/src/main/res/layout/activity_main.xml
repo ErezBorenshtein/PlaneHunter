@@ -5,42 +5,80 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#050A12"
     tools:context=".ui.activities.MainActivity">
 
     <com.example.planehunter.ui.views.RadarView
         android:id="@+id/radarView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        tools:layout_editor_absoluteX="1dp"
-        tools:layout_editor_absoluteY="0dp" />
-
-    <Button
-        android:id="@+id/btnLogout"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="44dp"
-        android:layout_marginEnd="32dp"
-        android:text="logout"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <Button
-        android:id="@+id/btnLeaderboard"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="40dp"
-        android:layout_marginTop="48dp"
-        android:text="Leaderboard"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <Button
-        android:id="@+id/btnSettings"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/topActions"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="28dp"
-        android:layout_marginBottom="68dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="38dp"
+        android:layout_marginEnd="18dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnLeaderboard"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Leaderboard"
+            android:textAllCaps="false"
+            android:textColor="#EAF6FF"
+            app:backgroundTint="#8020344A"
+            app:cornerRadius="16dp"
+            app:strokeColor="#66AEEBFF"
+            app:strokeWidth="1dp" />
+
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnLogout"
+            android:layout_width="110dp"
+            android:layout_height="48dp"
+            android:text="Logout"
+            android:textAllCaps="false"
+            android:textColor="#EAF6FF"
+            app:backgroundTint="#803A1F2A"
+            app:cornerRadius="16dp"
+            app:strokeColor="#66FF8A8A"
+            app:strokeWidth="1dp" />
+
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSettings"
+        android:layout_width="150dp"
+        android:layout_height="52dp"
+        android:layout_marginEnd="22dp"
+        android:layout_marginBottom="55dp"
         android:text="Settings"
+        android:textAllCaps="false"
+        android:textColor="#EAF6FF"
+        app:backgroundTint="#8020344A"
+        app:cornerRadius="18dp"
+        app:icon="@android:drawable/ic_menu_manage"
+        app:iconGravity="textStart"
+        app:iconPadding="8dp"
+        app:iconTint="#EAF6FF"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:strokeColor="#66AEEBFF"
+        app:strokeWidth="1dp" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
