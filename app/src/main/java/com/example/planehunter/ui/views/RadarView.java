@@ -259,7 +259,7 @@ public class RadarView extends View {
         Plane hit = findHitPlane(touchX, touchY);
 
         if (hit == null) {
-            setSelectedPlane(null); // clear selection
+            setSelectedPlane(""); // clear selection
             return true;
         }
 
@@ -283,6 +283,24 @@ public class RadarView extends View {
             }
         }
         return null;
+    }
+
+    public void setSelectedPlane(String icao24) {
+        String normalizedTarget = normalizeIcao(icao24);
+        if (normalizedTarget == null) {
+            setSelectedPlane((Plane) null);
+            return;
+        }
+
+        for (Plane plane : lastPlanes) {
+            if (plane == null) continue;
+
+            String normalizedPlaneIcao = normalizeIcao(plane.getIcao24());
+            if (normalizedTarget.equals(normalizedPlaneIcao)) {
+                setSelectedPlane(plane);
+                return;
+            }
+        }
     }
 
     public void setSelectedPlane(@Nullable Plane plane) {
@@ -388,16 +406,19 @@ public class RadarView extends View {
     }
 
     private void drawSelectedPlanePulse(Canvas canvas) {
-
         if (selectedPlane == null) return;
 
-        //find the selected plane's current screen position from blips list
+        String selectedIcao = normalizeIcao(selectedPlane.getIcao24());
+        if (selectedIcao == null) return;
+
         Blip selectedBlip = null;
+
         synchronized (lock) {
             for (Blip b : blips) {
                 if (b == null || b.plane == null) continue;
 
-                if (b.plane == selectedPlane) {
+                String blipIcao = normalizeIcao(b.plane.getIcao24());
+                if (selectedIcao.equals(blipIcao)) {
                     selectedBlip = b;
                     break;
                 }
@@ -409,19 +430,16 @@ public class RadarView extends View {
         long now = System.currentTimeMillis();
         long t = now - pulseStartTime;
 
-        final float periodMs = 1200f; //pulse period in ms
+        final float periodMs = 1200f;
         float phase = (t % (long) periodMs) / periodMs;
 
-        // Animate radius and alpha: ring expands and fades out.
         float baseR = Math.max(18f, selectedBlip.hitR);
         float radius = baseR + phase * (baseR * 1.2f);
         int alpha = (int) (255 * (1f - phase));
 
         paintPulse.setAlpha(alpha);
-
         canvas.drawCircle(selectedBlip.x, selectedBlip.y, radius, paintPulse);
 
-        //keep the animation running while plane is selected
         postInvalidateOnAnimation();
     }
 
@@ -477,5 +495,22 @@ public class RadarView extends View {
         int scaledHeight = Math.max(1, Math.round(srcHeight * scale));
 
         return Bitmap.createScaledBitmap(src, scaledWidth, scaledHeight, true);
+    }
+
+
+    public Plane findPlaneByIcao24(String icao24) {
+        String normalized = normalizeIcao(icao24);
+        if (normalized == null) return null;
+
+        for (Plane p : lastPlanes) {
+            if (p == null) continue;
+
+            String pIcao = normalizeIcao(p.getIcao24());
+            if (normalized.equals(pIcao)) {
+                return p;
+            }
+        }
+
+        return null;
     }
 }

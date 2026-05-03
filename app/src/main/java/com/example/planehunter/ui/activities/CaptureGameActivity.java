@@ -16,7 +16,7 @@ public class CaptureGameActivity extends AppCompatActivity {
     public static final String EXTRA_ICAO24 = "extra_icao24";
     public static final String EXTRA_CALLSIGN = "extra_callsign";
 
-    public static final String RESULT_HIT = "result_hit";
+    public static final String RESULT_HIT = "hit";
 
     private CaptureGameView captureView;
 
@@ -28,7 +28,6 @@ public class CaptureGameActivity extends AppCompatActivity {
         captureView = findViewById(R.id.captureView);
         ImageButton btnShutter = findViewById(R.id.btnShutter);
 
-        // Optional: you can show callsign somewhere if you want later
         //String icao24 = getIntent().getStringExtra(EXTRA_ICAO24);
         //String callsign = getIntent().getStringExtra(EXTRA_CALLSIGN);
 
@@ -60,6 +59,10 @@ public class CaptureGameActivity extends AppCompatActivity {
             finish();
         } else {
             Toast.makeText(this, "Miss! Try again.", Toast.LENGTH_SHORT).show();
+            Intent data = new Intent();
+            data.putExtra(RESULT_HIT, false);
+            setResult(RESULT_OK, data);
+            finish(); //so you wont be able to spam the button
         }
     }
 }

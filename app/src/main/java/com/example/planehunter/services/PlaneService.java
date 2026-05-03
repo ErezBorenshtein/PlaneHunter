@@ -80,7 +80,7 @@ public class PlaneService extends Service {
                         "✈ PlaneHunter",
                         "Starting...")
         );
-
+;
         locationClient = LocationServices.getFusedLocationProviderClient(this);
 
         fetcher = new OpenSkyFetcher();

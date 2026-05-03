@@ -15,6 +15,8 @@ public class NotificationHelper {
 
     public static final String CHANNEL_ID_FOREGROUND = "PlaneHunterForeground";
     public static final String CHANNEL_ID_ALERTS = "PlaneHunterAlerts";
+    public static final String FROM_NOTIFICATION = "from_notification";
+    public static final String ICAO_24 = "icao24";
 
     private static NotificationManager notificationManager;
 
@@ -52,8 +54,8 @@ public class NotificationHelper {
         Intent intent = new Intent( context ,com.example.planehunter.ui.activities.MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
-        intent.putExtra("from_notification", true);
-        intent.putExtra("icao24", icao24);
+        intent.putExtra(FROM_NOTIFICATION, true);
+        intent.putExtra(ICAO_24, icao24);
 
         PendingIntent pendingIntent =PendingIntent.getActivity(
                 context,

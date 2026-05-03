@@ -27,6 +27,7 @@ import com.example.planehunter.receivers.PlaneBroadcast;
 import com.example.planehunter.services.PlaneService;
 import com.example.planehunter.ui.dialogs.PlaneSheet;
 import com.example.planehunter.ui.views.RadarView;
+import com.example.planehunter.notifications.NotificationHelper;
 
 import java.util.ArrayList;
 
@@ -44,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean isReceiverRegistered = false;
 
     private Plane pendingCapturePlane;
+
+    private String pendingSelectedIcao24 = null;
 
     private final BroadcastReceiver planesReceiver = new BroadcastReceiver() {
         @Override
@@ -66,8 +69,35 @@ public class MainActivity extends AppCompatActivity {
 
             radarView.setUserLocation(userLat, userLon);
             radarView.setPlanes(planes);
+
+            if (pendingSelectedIcao24 != null) {
+                Plane plane = radarView.findPlaneByIcao24(pendingSelectedIcao24);
+
+                if (plane != null) {
+                    openPlaneSheet(plane);
+                    pendingSelectedIcao24 = null;
+                }
+            }
         }
     };
+
+    private void openPlaneSheet(Plane plane) {
+        if (plane == null) return;
+
+        radarView.setSelectedPlane(plane);
+
+        PlaneSheet sheet = PlaneSheet.newInstance(plane);
+        sheet.setListener(p -> {
+            pendingCapturePlane = p;
+
+            Intent i = new Intent(this, CaptureGameActivity.class);
+            i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
+            i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
+            startActivityForResult(i, REQUEST_CAPTURE_GAME);
+        });
+
+        sheet.show(getSupportFragmentManager(), "plane_sheet");
+    }
 
     // Foreground permissions (location + notifications on Android 13+)
     private final ActivityResultLauncher<String[]> permissionsLauncher =
@@ -112,6 +142,11 @@ public class MainActivity extends AppCompatActivity {
         initViews();
         setupRadar();
         setupButtons();
+
+        Intent intent = getIntent();
+        if (intent != null && intent.getBooleanExtra(NotificationHelper.FROM_NOTIFICATION, false)) {
+            pendingSelectedIcao24 = intent.getStringExtra(NotificationHelper.ICAO_24);
+        }
 
         //! Temporary
         radarView.setRadarRangeMeters(200_000.0); // 300 km
