@@ -9,7 +9,9 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -25,6 +27,7 @@ import com.example.planehunter.model.Plane;
 import com.example.planehunter.notifications.NotificationHelper;
 import com.example.planehunter.receivers.PlaneBroadcast;
 import com.example.planehunter.services.PlaneService;
+import com.example.planehunter.ui.dialogs.PlaneChooserSheet;
 import com.example.planehunter.ui.dialogs.PlaneSheet;
 import com.example.planehunter.ui.views.RadarView;
 import com.example.planehunter.notifications.NotificationHelper;
@@ -47,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
     private Plane pendingCapturePlane;
 
     private String pendingSelectedIcao24 = null;
+    private ProgressBar progLoadingPlanes;
 
     private final BroadcastReceiver planesReceiver = new BroadcastReceiver() {
         @Override
@@ -69,6 +73,10 @@ public class MainActivity extends AppCompatActivity {
 
             radarView.setUserLocation(userLat, userLon);
             radarView.setPlanes(planes);
+
+            radarView.post(()->{
+                progLoadingPlanes.setVisibility(View.GONE);
+            });
 
             if (pendingSelectedIcao24 != null) {
                 Plane plane = radarView.findPlaneByIcao24(pendingSelectedIcao24);
@@ -149,8 +157,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         //! Temporary
-        radarView.setRadarRangeMeters(200_000.0); // 300 km
-        //radarView.setRadarRangeMeters(150_000.0); // 100 km
+        radarView.setRadarRangeMeters(200_000.0); // 200 km
+        //radarView.setRadarRangeMeters(150_000.0); // 150 km
     }
 
     @Override
@@ -241,6 +249,7 @@ public class MainActivity extends AppCompatActivity {
         btnLogout = findViewById(R.id.btnLogout);
         btnLeaderBoard = findViewById(R.id.btnLeaderboard);
         btnSettings = findViewById(R.id.btnSettings);
+        progLoadingPlanes = findViewById(R.id.progLoadingPlanes);
     }
 
 
@@ -249,13 +258,13 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPlaneClicked(Plane plane) {
-                adarView.setSelectedPlane(plane);
+                radarView.setSelectedPlane(plane);
 
                 PlaneSheet sheet = PlaneSheet.newInstance(plane);
                 sheet.setListener(p -> {
                     pendingCapturePlane = p;
 
-                    Intent i = new Intent(this, CaptureGameActivity.class);
+                    Intent i = new Intent(MainActivity.this, CaptureGameActivity.class);
                     i.putExtra(CaptureGameActivity.EXTRA_ICAO24, p.getIcao24());
                     i.putExtra(CaptureGameActivity.EXTRA_CALLSIGN, p.getCallSign());
                     startActivityForResult(i, REQUEST_CAPTURE_GAME);
@@ -269,6 +278,15 @@ public class MainActivity extends AppCompatActivity {
                 showPlanesChooser(planes);
             }
         });
+    }
+
+    private void showPlanesChooser(ArrayList<Plane> planes) {
+        if (planes == null || planes.isEmpty()) return;
+
+        PlaneChooserSheet sheet = PlaneChooserSheet.newInstance(planes);
+        sheet.setCooldownIcaos(radarView.getCooldownIcaosCopy());
+        sheet.setListener(this::openPlaneSheet);
+        sheet.show(getSupportFragmentManager(), "plane_chooser");
     }
 
     private void setupButtons() {

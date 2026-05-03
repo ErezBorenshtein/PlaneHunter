@@ -268,7 +268,7 @@ public class RadarView extends View {
 
         if (hits.size() == 1) {
             listener.onPlaneClicked(hits.get(0));
-        } else if (hits.size() > 1) {
+        } else {
             listener.onMultiplePlanesClicked(hits);
         }
 
@@ -534,5 +534,11 @@ public class RadarView extends View {
         }
 
         return null;
+    }
+
+    public Set<String> getCooldownIcaosCopy() {
+        synchronized (lock) {
+            return new HashSet<>(cooldownIcaos);
+        }
     }
 }

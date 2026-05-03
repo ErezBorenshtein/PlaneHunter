@@ -49,11 +49,45 @@ public class LeaderboardAdapter extends RecyclerView.Adapter<LeaderboardAdapter.
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         LeaderboardEntry entry = entries.get(position);
-        holder.textName.setText(String.valueOf(position+1));//because starts in 0
+
+        holder.textRank.setText(String.valueOf(position + 1));
         holder.textName.setText(entry.name);
-        holder.textXp.setText("XP: " + entry.xp);
+        holder.textXp.setText(entry.xp + " XP");
         holder.textCaptures.setText("Captures: " + entry.captures);
 
+        setRankStyle(holder,position);
+
+    }
+
+    private void setRankStyle(ViewHolder holder, int position) {
+
+        int bgColor;
+        int textColor;
+
+        switch (position) {
+            case 0: // Gold
+                bgColor = 0xFFFFD700;
+                textColor = 0xFF000000;
+                break;
+
+            case 1: // Silver
+                bgColor = 0xFFC0C0C0;
+                textColor = 0xFF000000;
+                break;
+
+            case 2: // Bronze
+                bgColor = 0xFFCD7F32;
+                textColor = 0xFFFFFFFF;
+                break;
+
+            default:
+                bgColor = 0xFF4D6BFF;
+                textColor = 0xFFFFFFFF;
+                break;
+        }
+
+        holder.textRank.setBackgroundColor(bgColor);
+        holder.textRank.setTextColor(textColor);
     }
 
     @Override

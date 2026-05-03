@@ -23,7 +23,7 @@ import java.util.List;
 
 public class LeaderboardActivity extends AppCompatActivity {
 
-    private static final int LEADERBOARD_LIMIT = 50;
+    private static final int LEADERBOARD_LIMIT = 3;
 
     private RecyclerView recyclerLeaderboard;
     private LeaderboardAdapter adapter;

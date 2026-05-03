@@ -187,25 +187,30 @@ public class PlaneService extends Service {
     }
 
     private void fetchBroadcastAndUpdateFg(double lat, double lon) {
-        fetcher.fetchPlanes(lat, lon, planesFound ->
-                skyLinkFetcher.enrichPlanesAsync(planesFound, () -> {
-                    Intent intent = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);
-                    intent.setPackage(getPackageName());
-                    sendBroadcast(intent);
+        fetcher.fetchPlanes(lat, lon, planesFound ->{
+            if (planesFound == null){
+                Log.d(TAG,"Fetch failed, keeping last known planes");
+                return;
+            }
 
-                    Log.d(TAG, "Broadcast sent. planes=" + (planesFound == null ? 0 : planesFound.size()));
+            skyLinkFetcher.enrichPlanesAsync(planesFound, () -> {
+                Intent intent = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);
+                intent.setPackage(getPackageName());
+                sendBroadcast(intent);
 
-                    notifyForPlanes(lat, lon, planesFound);
+                Log.d(TAG, "Broadcast sent. planes=" + planesFound.size());
 
-                    long now = System.currentTimeMillis();
-                    if (now - lastForegroundUpdateMs < FOREGROUND_UPDATE) {
-                        return;
-                    }
+                notifyForPlanes(lat, lon, planesFound);
 
-                    lastForegroundUpdateMs = now;
-                    updateForeground(lat, lon, planesFound);
-                })
-        );
+                long now = System.currentTimeMillis();
+                if (now - lastForegroundUpdateMs < FOREGROUND_UPDATE) {
+                    return;
+                }
+
+                lastForegroundUpdateMs = now;
+                updateForeground(lat, lon, planesFound);
+            });
+        });
     }
 
     private void notifyForPlanes(double userLat, double userLon, ArrayList<Plane> planesFound) {
