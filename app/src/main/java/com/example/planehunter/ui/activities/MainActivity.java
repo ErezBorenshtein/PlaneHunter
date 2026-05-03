@@ -69,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
             double userLon = PlaneBroadcast.getUserLon(intent);
             ArrayList<Plane> planes = PlaneBroadcast.getPlanes(intent);
 
-            Log.d(TAG, "planes=" + (planes == null ? 0 : planes.size()));
+            Log.d(TAG, "planes=" + planes.size());
 
             radarView.setUserLocation(userLat, userLon);
             radarView.setPlanes(planes);
@@ -364,11 +364,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean hasAllRequiredPermissions() {
         boolean hasLoc = hasForegroundLocationPermission();
 
-        boolean hasNotif = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            hasNotif = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                    == PackageManager.PERMISSION_GRANTED;
-        }
+        boolean hasNotif = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED;
 
         return hasLoc && hasNotif;
     }
@@ -381,9 +378,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean hasBackgroundLocationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return true;
-        }
 
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
@@ -391,9 +385,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestBackgroundLocationIfNeeded() {
         // Must request separately after foreground location is granted
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return;
-        }
 
         if (!hasForegroundLocationPermission()) {
             return;
@@ -410,18 +401,12 @@ public class MainActivity extends AppCompatActivity {
     private String[] buildRequiredPermissionsArray() {
         // Do not include ACCESS_BACKGROUND_LOCATION here.
         // Android will only offer "While using the app" if you request background together with foreground.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return new String[]{
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.POST_NOTIFICATIONS
-            };
-        }
-
         return new String[]{
                 Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.POST_NOTIFICATIONS
         };
+
     }
 
     private void startPlaneServiceIfNeeded() {

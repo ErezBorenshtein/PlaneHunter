@@ -31,7 +31,10 @@ import java.util.Set;
 
 public class FirebaseHandler {
 
+    //volatile prevents instruction reordering and ensures the instance
+    //is fully initialized before being accessed by other threads
     private static volatile FirebaseHandler instance;
+
 
     private static final long CAPTURE_COOLDOWN_MS = 30L * 60L * 1000L;
 
@@ -93,12 +96,14 @@ public class FirebaseHandler {
 
     @Nullable
     public String getUidOrNull() {
+        //when user can be null
         FirebaseUser user = auth.getCurrentUser();
         return user == null ? null : user.getUid();
     }
 
     @NonNull
     public String getUidOrThrow() {
+        //when user can't be null
         String uid = getUidOrNull();
         if (uid == null) {
             throw new IllegalStateException("Not signed-in");
@@ -126,18 +131,16 @@ public class FirebaseHandler {
         return db.collection("leaderboard").document(getUidOrThrow());
     }
 
-    private DocumentReference myCaptureDoc(@NonNull String captureKey) {
-        return myUserDoc().collection("captures").document(captureKey);
-    }
-
     public Task<Void> ensureDefaultProfile(@NonNull String displayName) {
         return myUserDoc().get().continueWithTask(task -> {
             DocumentSnapshot doc = task.getResult();
 
+            //if already exists, return
             if (doc != null && doc.exists()) {
                 return Tasks.forResult(null);
             }
 
+            //else create new profile in Firebase
             UserProfile profile = new UserProfile(getUidOrThrow(), displayName);
             return myUserDoc().set(profile);
         });
@@ -160,19 +163,11 @@ public class FirebaseHandler {
         profile.alertCategories = new ArrayList<>(alertCategories);
         profile.updatedAtMs = System.currentTimeMillis();
 
-        return myUserDoc().set(profile, SetOptions.merge()); //merges with the other categories
-    }
-
-    public Task<Void> updateMySettings(boolean notifyEnabled, int radiusKm) {
-        UserProfile profile = new UserProfile();
-        profile.notifyEnabled = notifyEnabled;
-        profile.radiusKm = radiusKm;
-        profile.updatedAtMs = System.currentTimeMillis();
-
-        return myUserDoc().set(profile, SetOptions.merge());
+        return myUserDoc().set(profile, SetOptions.merge()); //updates only the alert categories
     }
 
     public ListenerRegistration listenToMyProfile(@NonNull ProfileListener listener) {
+        //listens to changes in real time
         return myUserDoc().addSnapshotListener(new EventListener<DocumentSnapshot>() {
             @Override
             public void onEvent(@Nullable DocumentSnapshot value, @Nullable FirebaseFirestoreException error) {
@@ -198,6 +193,9 @@ public class FirebaseHandler {
         String captureKey = buildCaptureKey(plane);
         long baseXp = resolveBaseXp(plane);
 
+
+        //run the capture award logic in a Firestore transaction so the cooldown check,
+        //XP update, capture record, and leaderboard update are calculated and written as one unit.
         return db.runTransaction(transaction -> {
             DocumentReference userRef = db.collection("users").document(uid);
             DocumentReference captureRef = userRef.collection("captures").document(captureKey);
@@ -215,6 +213,7 @@ public class FirebaseHandler {
                 long lastCaughtAtMs = getLong(captureSnap, "lastCaughtAtMs");
                 long elapsedMs = now - lastCaughtAtMs;
 
+                //if in cooldown, don't award XP
                 if (elapsedMs < CAPTURE_COOLDOWN_MS) {
                     result.awarded = false;
                     result.firstTime = false;
@@ -225,9 +224,8 @@ public class FirebaseHandler {
                 }
             }
 
-            long xpAwarded = firstTime
-                    ? Math.round(baseXp * FIRST_TIME_MULTIPLIER)
-                    : Math.round(baseXp * REPEAT_MULTIPLIER);
+            long xpAwarded = firstTime ? (long)(baseXp * FIRST_TIME_MULTIPLIER)
+                    : (long)(baseXp * REPEAT_MULTIPLIER);
 
             profile.xp += xpAwarded;
             profile.caughtCount += 1L;
@@ -237,7 +235,7 @@ public class FirebaseHandler {
                 profile.uniqueRegistrationsCount += 1L;
             }
 
-            PlaneCapture capture = buildPlaneCaptureForWrite(plane, now, captureSnap, firstTime);
+            PlaneCapture capture = buildPlaneCaptureForFirebase(plane, now, captureSnap, firstTime);
 
             transaction.set(userRef, profile, SetOptions.merge());
             transaction.set(captureRef, capture, SetOptions.merge());
@@ -273,7 +271,6 @@ public class FirebaseHandler {
 
 
     public void getMyLeaderboardRank(@NotNull MyRankListener listener){
-        String uid = getUidOrThrow();
 
         myLeaderboardDoc().get()
                 .addOnSuccessListener(doc->{
@@ -287,12 +284,16 @@ public class FirebaseHandler {
                        return;
                    }
 
-                   long xp = doc.getLong("xp") !=null ? doc.getLong("xp") :0;
+                   long xp =0;
+
+                   if(doc.getLong("xp") !=null){
+                        xp = doc.getLong("xp");
+                   };
 
                    db.collection("leaderboard").whereGreaterThan("xp",xp)
-                           .get()
+                           .get() //gets all the users sith more XP than you
                            .addOnSuccessListener(aboveQuery->{
-                               long rank = aboveQuery.size() +1L;
+                               long rank = aboveQuery.size() +1L; //size +1 = your rank
                                listener.onSuccess(entry,rank);
                            })
                            .addOnFailureListener(listener::onError);
@@ -301,10 +302,9 @@ public class FirebaseHandler {
 
     }
 
-
-
     public Task<Set<String>> getMyPlanesInCooldown() {
         //for showing the planes in cooldown in gray
+
         long now = System.currentTimeMillis();
 
         return myUserDoc()
@@ -365,7 +365,7 @@ public class FirebaseHandler {
         return profile;
     }
 
-    private PlaneCapture buildPlaneCaptureForWrite(
+    private PlaneCapture buildPlaneCaptureForFirebase(
             @NonNull Plane plane,
             long now,
             @NonNull DocumentSnapshot existingCaptureSnap,
@@ -437,11 +437,8 @@ public class FirebaseHandler {
     private String buildCaptureKey(@NonNull Plane plane) {
         String icao24 = normalizeKeyPart(plane.getIcao24());
 
-        if (!icao24.isEmpty()) {
-            return "ICAO_" + icao24;
-        }
+        return "ICAO_" + icao24;
 
-        throw new IllegalStateException("Plane must have icao24");
     }
 
     @Nullable

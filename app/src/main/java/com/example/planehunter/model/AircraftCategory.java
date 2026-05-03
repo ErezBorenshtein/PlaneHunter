@@ -24,11 +24,6 @@ public final class AircraftCategory {
 	@NonNull
 	public static ArrayList<Long> getDefaultAlertCategories() {
 		ArrayList<Long> categories = new ArrayList<>();
-		categories.add(AIRLINER);
-		categories.add(CARGO);
-		categories.add(BUSINESS_JET);
-		categories.add(GENERAL_AVIATION);
-		categories.add(TURBOPROP_REGIONAL);
 		categories.add(HELICOPTER);
 		categories.add(MILITARY_GOVERNMENT);
 		return categories;
