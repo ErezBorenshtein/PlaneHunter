@@ -49,7 +49,7 @@ public class Plane implements Parcelable {
         countryCode = in.readString();
     }
 
-    public static final Creator<Plane> CREATOR = new Creator<Plane>() {
+    public static final Creator<Plane> CREATOR = new Creator<>() {
         @Override
         public Plane createFromParcel(Parcel in) {
             return new Plane(in);
@@ -169,7 +169,4 @@ public class Plane implements Parcelable {
         return countryCode;
     }
 
-    public void setCountryCode(String countryCode) {
-        this.countryCode = countryCode;
-    }
 }

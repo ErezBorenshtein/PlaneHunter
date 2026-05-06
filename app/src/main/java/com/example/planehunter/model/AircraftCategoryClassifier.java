@@ -3,8 +3,6 @@ package com.example.planehunter.model;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.example.planehunter.model.AircraftCategory;
-
 import java.util.Locale;
 
 public final class AircraftCategoryClassifier {

@@ -3,6 +3,7 @@ package com.example.planehunter.data.firebase;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.example.planehunter.model.AircraftCategory;
 import com.example.planehunter.model.Plane;
 import com.example.planehunter.model.PlaneCapture;
 import com.example.planehunter.model.UserProfile;
@@ -191,7 +192,7 @@ public class FirebaseHandler {
         long now = System.currentTimeMillis();
 
         String captureKey = buildCaptureKey(plane);
-        long baseXp = resolveBaseXp(plane);
+        long baseXp = resolveXpByCategory(plane.getCategory());
 
 
         //run the capture award logic in a Firestore transaction so the cooldown check,
@@ -204,7 +205,7 @@ public class FirebaseHandler {
             DocumentSnapshot userSnap = transaction.get(userRef);
             DocumentSnapshot captureSnap = transaction.get(captureRef);
 
-            UserProfile profile = buildProfileForTransaction(userSnap, uid);
+            UserProfile profile = buildProfile(userSnap, uid);
             CaptureAwardResult result = new CaptureAwardResult();
 
             boolean firstTime = !captureSnap.exists();
@@ -346,7 +347,7 @@ public class FirebaseHandler {
                 .limit(limit);
     }
 
-    private UserProfile buildProfileForTransaction(@NonNull DocumentSnapshot userSnap, @NonNull String uid) {
+    private UserProfile buildProfile(@NonNull DocumentSnapshot userSnap, @NonNull String uid) {
         UserProfile profile = userSnap.toObject(UserProfile.class);
 
         if (profile == null) {
@@ -373,11 +374,11 @@ public class FirebaseHandler {
     ) {
         if (firstTime) {
             return new PlaneCapture(
-                    emptyToNull(plane.getRegistration()),
-                    emptyToNull(plane.getIcao24()),
-                    emptyToNull(plane.getTypeCode()),
-                    emptyToNull(plane.getTypeName()),
-                    emptyToNull(plane.getCallSign()),
+                    convEmptyToNull(plane.getRegistration()),
+                    convEmptyToNull(plane.getIcao24()),
+                    convEmptyToNull(plane.getTypeCode()),
+                    convEmptyToNull(plane.getTypeName()),
+                    convEmptyToNull(plane.getCallSign()),
                     now
             );
         }
@@ -385,11 +386,11 @@ public class FirebaseHandler {
         PlaneCapture capture = existingCaptureSnap.toObject(PlaneCapture.class);
         if (capture == null) {
             return new PlaneCapture(
-                    emptyToNull(plane.getRegistration()),
-                    emptyToNull(plane.getIcao24()),
-                    emptyToNull(plane.getTypeCode()),
-                    emptyToNull(plane.getTypeName()),
-                    emptyToNull(plane.getCallSign()),
+                    convEmptyToNull(plane.getRegistration()),
+                    convEmptyToNull(plane.getIcao24()),
+                    convEmptyToNull(plane.getTypeCode()),
+                    convEmptyToNull(plane.getTypeName()),
+                    convEmptyToNull(plane.getCallSign()),
                     now
             );
         }
@@ -429,127 +430,48 @@ public class FirebaseHandler {
     }
 
     private LeaderboardEntry buildLeaderboardEntry(@NonNull String uid,@NonNull String name, long xp, long captures) {
-        LeaderboardEntry entry = new LeaderboardEntry(uid,name,xp,captures);
-
-        return entry;
+        return new LeaderboardEntry(uid,name,xp,captures);
     }
 
     private String buildCaptureKey(@NonNull Plane plane) {
-        String icao24 = normalizeKeyPart(plane.getIcao24());
-
-        return "ICAO_" + icao24;
-
+        return "ICAO_" + normalizeICAO(plane.getIcao24());
     }
 
-    @Nullable
-    private String preferNonEmpty(@Nullable String existingValue, @Nullable String newValue) {
-        String normalizedNewValue = emptyToNull(newValue);
-        if (normalizedNewValue != null) {
-            return normalizedNewValue;
+    private Long resolveXpByCategory(long category) {
+        if (category == AircraftCategory.HELICOPTER) {
+            return XP_TIER_3;
         }
 
-        return emptyToNull(existingValue);
-    }
-
-    private long resolveBaseXp(@NonNull Plane plane) {
-        String typeCode = normalizeForMatch(plane.getTypeCode());
-        String typeName = normalizeForMatch(plane.getTypeName());
-
-        Long byTypeCode = resolveXpByTypeCode(typeCode);
-        if (byTypeCode != null) {
-            return byTypeCode;
+        if (category == AircraftCategory.MILITARY_GOVERNMENT) {
+            return XP_TIER_5;
         }
 
-        Long byTypeName = resolveXpByTypeName(typeName);
-        if (byTypeName != null) {
-            return byTypeName;
+        if (category == AircraftCategory.BUSINESS_JET) {
+            return XP_TIER_4;
+        }
+
+        if (category == AircraftCategory.CARGO) {
+            return XP_TIER_4;
+        }
+
+        if (category == AircraftCategory.AIRLINER) {
+            return XP_TIER_2;
+        }
+
+        if (category == AircraftCategory.TURBOPROP_REGIONAL) {
+            return XP_TIER_2;
+        }
+
+        if (category == AircraftCategory.GENERAL_AVIATION) {
+            return XP_TIER_1;
         }
 
         return XP_TIER_1;
     }
 
-    @Nullable
-    private Long resolveXpByTypeName(@NonNull String typeName) {
-        if (typeName.isEmpty()) {
-            return null;
-        }
-
-        if (containsAny(typeName, "A380", "ANTONOV", "AN-124", "AN-225", "C-130", "C-17", "C-5", "A400")) {
-            return XP_TIER_5;
-        }
-
-        if (containsAny(typeName, "777", "A350", "747")) {
-            return XP_TIER_4;
-        }
-
-        if (containsAny(typeName, "787", "767", "A330", "A340")) {
-            return XP_TIER_3;
-        }
-
-        if (containsAny(typeName, "A319", "A220", "E190", "E195", "EMBRAER", "ATR", "CRJ", "DASH 8", "Q400")) {
-            return XP_TIER_2;
-        }
-
-        if (containsAny(typeName, "A320", "A321", "737")) {
-            return XP_TIER_1;
-        }
-
-        return null;
-    }
-
-    @Nullable
-    private Long resolveXpByTypeCode(@NonNull String typeCode) {
-        if (typeCode.isEmpty()) {
-            return null;
-        }
-
-        if (startsWithAny(typeCode, "A388")) return XP_TIER_5;
-        if (startsWithAny(typeCode, "AN12", "AN22", "AN24", "AN72", "AN124", "AN225")) return XP_TIER_5;
-        if (startsWithAny(typeCode, "C130", "C17", "C5", "E3", "A400")) return XP_TIER_5;
-
-        if (startsWithAny(typeCode, "B77", "A35", "B744", "B748", "B74")) return XP_TIER_4;
-
-        if (startsWithAny(typeCode, "B78", "B76", "A33", "A34")) return XP_TIER_3;
-
-        if (startsWithAny(typeCode, "A319", "A220", "E190", "E195", "AT72", "AT75", "CRJ", "DH8")) {
-            return XP_TIER_2;
-        }
-
-        if (startsWithAny(typeCode, "A320", "A321", "B737", "B738", "B739", "B73")) {
-            return XP_TIER_1;
-        }
-
-        return null;
-    }
-
-    private boolean startsWithAny(@NonNull String source, @NonNull String... prefixes) {
-        for (String prefix : prefixes) {
-            if (source.startsWith(prefix)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean containsAny(@NonNull String source, @NonNull String... values) {
-        for (String value : values) {
-            if (source.contains(value)) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     @NonNull
-    private String normalizeForMatch(@Nullable String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim().toUpperCase(Locale.US);
-    }
-
-    @NonNull
-    private String normalizeKeyPart(@Nullable String value) {
+    private String normalizeICAO(@Nullable String value) {
         if (value == null) {
             return "";
         }
@@ -560,7 +482,7 @@ public class FirebaseHandler {
     }
 
     @Nullable
-    private String emptyToNull(@Nullable String value) {
+    private String convEmptyToNull(@Nullable String value) {
         if (value == null) {
             return null;
         }

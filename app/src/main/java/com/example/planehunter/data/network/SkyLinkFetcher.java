@@ -34,16 +34,13 @@ public class SkyLinkFetcher {
     private static final String PREFS_NAME = "skylink_aircraft_cache";
     private static final String PREF_KEY_PREFIX = "aircraft_";
     private static final int MAX_LOOKUPS_PER_BATCH = 3;
-
-    private final Context appContext;
     private final String apiKey;
     private final SharedPreferences prefs;
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-
+    private final Handler mainHandler = new Handler(Looper.getMainLooper()); //handler for main(UI) thread
     private final Object cacheLock = new Object();
 
     private final Map<String, AircraftData> memoryCache = new HashMap<>();
-    private final Set<String> negativeCache = new HashSet<>();
+    private final Set<String> negativeCache = new HashSet<>(); //planes we searched that returned nothing
     private final Set<String> inFlight = new HashSet<>();
 
     public interface DoneCallback {
@@ -51,12 +48,12 @@ public class SkyLinkFetcher {
     }
 
     public SkyLinkFetcher(@NonNull Context context, @Nullable String apiKey) {
-        this.appContext = context.getApplicationContext();
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.prefs = this.appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        Context appContext = context.getApplicationContext();
+        this.apiKey = apiKey == null ? "" : apiKey;
+        this.prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
-    public void enrichPlanesAsync(@Nullable ArrayList<Plane> planes, @NonNull DoneCallback callback) {
+    public void enrichPlanesData(@Nullable ArrayList<Plane> planes, @NonNull DoneCallback callback) {
         new Thread(() -> {
             try {
                 if (planes == null || planes.isEmpty()) {
@@ -74,7 +71,8 @@ public class SkyLinkFetcher {
 
                     applyCachedDataToPlane(plane);
 
-                    if (!needsdataForClassification(plane)) {
+                    if (!needsDataForClassification(plane)) {
+                        //no need to create API request if data exists already
                         continue;
                     }
 
@@ -95,7 +93,7 @@ public class SkyLinkFetcher {
                         continue;
                     }
 
-                    AircraftData data = fetchDataSync(icao, false);
+                    AircraftData data = fetchDataSync(icao, false); //fetch without photo because it takes too long
                     lookedUpNow.add(icao);
                     lookupsDone++;
 
@@ -103,12 +101,12 @@ public class SkyLinkFetcher {
                         applyDataToPlane(plane, data);
                     }
                 }
-
-                for (Plane plane : planes) {
-                    if (plane != null) {
-                        applyCachedDataToPlane(plane);
-                    }
-                }
+                //
+                //for (Plane plane : planes) {
+                //    if (plane != null) {
+                //        applyCachedDataToPlane(plane);
+                //    }
+                //}
 
             } catch (Exception e) {
                 Log.e(TAG, "enrichPlanesAsync failed", e);
@@ -149,7 +147,7 @@ public class SkyLinkFetcher {
         mainHandler.post(callback::onDone);
     }
 
-    private boolean needsdataForClassification(@NonNull Plane plane) {
+    private boolean needsDataForClassification(@NonNull Plane plane) {
         return plane.getCategory() == AircraftCategory.UNKNOWN
                 || isBlank(plane.getTypeCode())
                 || isBlank(plane.getTypeName());
@@ -169,7 +167,7 @@ public class SkyLinkFetcher {
             return;
         }
 
-        AircraftData data = getMemoryCacheEntry(icao);
+        AircraftData data = getCacheEntry(icao);
 
         if (data == null) {
             data = readDataFromPrefs(icao);
@@ -188,8 +186,8 @@ public class SkyLinkFetcher {
 
     @Nullable
     private AircraftData fetchDataSync(@NonNull String icao, boolean includePhoto) {
-        AircraftData cached = getMemoryCacheEntry(icao);
-        if (cached != null && (!includePhoto || !isBlank(cached.photoUrl))) {
+        AircraftData cached = getCacheEntry(icao);
+        if (cached != null && (!includePhoto || !isBlank(cached.photoUrl))) { //if cached and we don't need photo, use it or already have photo URL
             return cached;
         }
 
@@ -213,6 +211,13 @@ public class SkyLinkFetcher {
         HttpURLConnection connection = null;
 
         try {
+            /*
+                curl --request GET \
+	            --url 'https://skylink-api.p.rapidapi.com/aircraft/icao24/%7Bicao24%7D?photos=true' \
+	            --header 'Content-Type: application/json' \
+	            --header 'x-rapidapi-host: skylink-api.p.rapidapi.com' \
+	            --header 'x-rapidapi-key: YOU_API_KEY'
+             */
             String url = "https://skylink-api.p.rapidapi.com/aircraft/icao24/" + icao + "?photos=" + includePhoto;
 
             connection = (HttpURLConnection) new URL(url).openConnection();
@@ -223,16 +228,20 @@ public class SkyLinkFetcher {
             connection.setRequestProperty("x-rapidapi-host", "skylink-api.p.rapidapi.com");
 
             int code = connection.getResponseCode();
-            InputStream inputStream = (code >= 200 && code < 300)
-                    ? connection.getInputStream()
-                    : connection.getErrorStream();
+            InputStream inputStream;
+            String body;
 
-            String body = readAll(inputStream);
-
-            Log.d(TAG, "SkyLink URL=" + url);
-            Log.d(TAG, "SkyLink code=" + code + " body=" + body);
-
-            if (code < 200 || code >= 300) {
+            if(code >= 200 && code < 300){
+                inputStream =connection.getInputStream();
+                body = readAll(inputStream);
+                Log.d(TAG, "SkyLink URL=" + url);
+                Log.d(TAG, "SkyLink code=" + code + " body=" + body);
+            }
+            else{
+                inputStream =connection.getErrorStream();
+                body = readAll(inputStream);
+                Log.d(TAG, "SkyLink URL=" + url);
+                Log.d(TAG, "SkyLink code=" + code + " body=" + body);
                 return cachedFromPrefs;
             }
 
@@ -459,7 +468,7 @@ public class SkyLinkFetcher {
     }
 
     @Nullable
-    private AircraftData getMemoryCacheEntry(@NonNull String icao) {
+    private AircraftData getCacheEntry(@NonNull String icao) {
         synchronized (cacheLock) {
             return memoryCache.get(icao);
         }

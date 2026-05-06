@@ -6,7 +6,7 @@ public class LeaderboardEntry {
     public long xp;
     public long captures;
 
-    public LeaderboardEntry() {}//for firebase
+    public LeaderboardEntry() {}
 
     public LeaderboardEntry(String uid,String name, long xp, long captures) {
         this.uid = uid;

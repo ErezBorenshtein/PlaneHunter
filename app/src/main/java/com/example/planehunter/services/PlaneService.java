@@ -193,7 +193,7 @@ public class PlaneService extends Service {
                 return;
             }
 
-            skyLinkFetcher.enrichPlanesAsync(planesFound, () -> {
+            skyLinkFetcher.enrichPlanesData(planesFound, () -> {
                 Intent intent = PlaneBroadcast.buildPlanesUpdatedIntent(lat, lon, planesFound);
                 intent.setPackage(getPackageName());
                 sendBroadcast(intent);

@@ -12,6 +12,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -38,10 +39,13 @@ public class OpenSkyFetcher {
     private String clientId = null;
     private String clientSecret = null;
 
+    //protects the cached token so two threads will not update it at the same time
     private final Object tokenLock = new Object();
+
     private String cachedToken = null;
     private long tokenExpiryMs = 0;
 
+    //object used to keep the token value together with its expiration time
     private static class TokenResponse {
         String accessToken;
         int expiresInSec;
@@ -63,6 +67,7 @@ public class OpenSkyFetcher {
             try {
                 double[] bbox = boundingBox(latCenter, lonCenter, radiusKm);
 
+                //https://openskynetwork.github.io/opensky-api/rest.html
                 String urlString = String.format(
                         "https://opensky-network.org/api/states/all?lamin=%f&lamax=%f&lomin=%f&lomax=%f&extended=1",
                         bbox[0], bbox[1], bbox[2], bbox[3]
@@ -72,8 +77,8 @@ public class OpenSkyFetcher {
 
                 HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
                 connection.setRequestMethod("GET");
-                connection.setConnectTimeout(8000);
-                connection.setReadTimeout(8000);
+                connection.setConnectTimeout(8000); //8 minutes
+                connection.setReadTimeout(8000);   //8 minutes
 
                 String token = getValidToken();
                 if (token != null && !token.isEmpty()) {
@@ -85,18 +90,23 @@ public class OpenSkyFetcher {
                 int code = connection.getResponseCode();
                 Log.d(TAG, "HTTP code=" + code);
 
-                InputStream is = (code >= 200 && code < 300)
-                        ? connection.getInputStream()
-                        : connection.getErrorStream();
+                InputStream is =null;
+                String body;
 
-                String body = readAll(is);
-                connection.disconnect();
-
-                if (code < 200 || code >= 300) {
+                if(code >= 200 && code < 300){
+                    Log.d(TAG,"HTTP success");
+                    is =connection.getInputStream();
+                    body = readAll(is);
+                }
+                else{
+                    is =connection.getErrorStream();
+                    body = readAll(is);
                     Log.d(TAG, "HTTP error body: " + body);
                     postResult(callback, planes);
                     return;
                 }
+
+                connection.disconnect();
 
                 // ------------------------------------------------------------
                 // OpenSky API response format
@@ -121,7 +131,7 @@ public class OpenSkyFetcher {
                 // ------------------------------------------------------------
 
                 JSONObject data = new JSONObject(body);
-                JSONArray states = data.optJSONArray("states");
+                JSONArray states = data.optJSONArray("states"); //divides by states(planes)
 
                 Log.d(TAG, "states array = " + (states == null ? "null" : states.length()));
 
@@ -134,35 +144,34 @@ public class OpenSkyFetcher {
                             continue;
                         }
 
-                        boolean onGround = state.optBoolean(8, false);
-                        if (onGround){
+                        if (state.optBoolean(8, false)){ //we don't need planes that are on ground
                             Log.d(TAG,"on ground");
                             continue;
                         }
 
                         double lon = state.optDouble(5, Double.NaN);
                         double lat = state.optDouble(6, Double.NaN);
+
                         if (Double.isNaN(lat) || Double.isNaN(lon)) continue;
 
                         double distanceKm = UtilMath.haversineMeters(latCenter, lonCenter, lat, lon) / 1000.0;
                         if (distanceKm > radiusKm){
-                            Log.d(TAG,"bigger than radius");
+                            //Log.d(TAG,"bigger than radius");
                             continue;
                         }
 
-                        String icao = safe(state.optString(0, ""));
-                        String callSign = safe(state.optString(1, "N/A"));
+                        String icao = cleanString(state.optString(0, ""));
+                        String callSign = cleanString(state.optString(1, "N/A"));
                         double altitude = state.optDouble(7, 0.0);
                         double trackDeg = state.optDouble(10, Double.NaN);
                         String countryCode = getCountryCode(state.optString(2,"N/A"));
 
                         Plane plane = new Plane(icao, callSign, lat, lon, altitude, null, trackDeg, (int) AircraftCategory.UNKNOWN,countryCode);
-                        plane.setCategory(AircraftCategory.UNKNOWN);
                         planes.add(plane);
                     }
                 }
 
-                Log.d(TAG, "Filtered planes count=" + planes.size());
+                //Log.d(TAG, "Filtered planes count=" + planes.size());
 
             } catch (Exception e) {
                 Log.e(TAG, "Fetch failed: " + e.getMessage(), e);
@@ -174,10 +183,10 @@ public class OpenSkyFetcher {
 
     private String getCountryCode(String countryName) {
         //https://www.javamadesoeasy.com/2016/10/display-name-of-all-countries-with.html
-        for (String iso : Locale.getISOCountries()) {
-            Locale locale = new Locale("", iso);
+        for (String countryCode : Locale.getISOCountries()) {
+            Locale locale = new Locale("", countryCode);
             if (locale.getDisplayCountry(Locale.ENGLISH).equalsIgnoreCase(countryName)) {
-                return iso;
+                return countryCode;
             }
         }
         return null;
@@ -205,20 +214,34 @@ public class OpenSkyFetcher {
     }
 
     private TokenResponse fetchToken(String clientId, String clientSecret) {
+        //https://openskynetwork.github.io/opensky-api/rest.html#all-state-vectors
         HttpURLConnection connection = null;
         try {
+            /*
+            export CLIENT_ID=your_client_id
+            export CLIENT_SECRET=your_client_secret
+
+            export TOKEN=$(curl -X POST "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -d "grant_type=client_credentials" \
+              -d "client_id=$CLIENT_ID" \
+              -d "client_secret=$CLIENT_SECRET" | jq -r .access_token)
+
+            curl -H "Authorization: Bearer $TOKEN" https://opensky-network.org/api/states/all | jq .
+            */
+
             String body =
                     "grant_type=client_credentials" +
                             "&client_id=" + URLEncoder.encode(clientId, "UTF-8") +
                             "&client_secret=" + URLEncoder.encode(clientSecret, "UTF-8");
 
-            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8); //http work with bytes not Strings
 
             connection = (HttpURLConnection) new URL(TOKEN_URL).openConnection();
             connection.setRequestMethod("POST");
             connection.setConnectTimeout(8000);
             connection.setReadTimeout(8000);
-            connection.setDoOutput(true);
+            connection.setDoOutput(true); //lets you send bytes
             connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
             OutputStream outputStream = connection.getOutputStream();
@@ -226,11 +249,19 @@ public class OpenSkyFetcher {
             outputStream.flush();
             outputStream.close();
 
-            int responseCode = connection.getResponseCode();
-            InputStream inputStream = (responseCode >= 200 && responseCode < 300) ? connection.getInputStream() : connection.getErrorStream();
-            String response = readAll(inputStream);
 
-            if (responseCode < 200 || responseCode >= 300) {
+            int responseCode = connection.getResponseCode();
+
+            InputStream inputStream;
+            String response;
+
+            if(responseCode >= 200 && responseCode < 300){
+                inputStream = connection.getInputStream();
+                response = readAll(inputStream);
+            }
+            else{
+                inputStream = connection.getErrorStream();
+                response = readAll(inputStream);
                 Log.e(TAG, "Token HTTP " + responseCode + " body=" + response);
                 return null;
             }
@@ -250,26 +281,31 @@ public class OpenSkyFetcher {
     }
 
     private void postResult(PlanesCallback callback, ArrayList<Plane> planes) {
-        new Handler(Looper.getMainLooper()).post(() -> callback.onPlanesFetched(planes));
+        new Handler(Looper.getMainLooper()).post(() -> callback.onPlanesFetched(planes)); //returns data to UI thread
     }
 
-    private String readAll(InputStream inputStream) throws Exception {
+    private String readAll(InputStream inputStream) throws IOException {
         if (inputStream == null) return "";
         BufferedReader input = new BufferedReader(new InputStreamReader(inputStream));
         StringBuilder stringBuilder = new StringBuilder();
         String line;
-        while ((line = input.readLine()) != null) stringBuilder.append(line);
+        while ((line = input.readLine()) != null){
+            stringBuilder.append(line);
+        }
         input.close();
         return stringBuilder.toString();
     }
 
-    private String safe(String s) {
-        return s == null ? "" : s.trim();
+    private String cleanString(String s) {
+        if (s == null) return "";
+
+        String trimmed = s.trim();
+        return trimmed.isEmpty() ? "" : trimmed;
     }
 
     private double[] boundingBox(double lat, double lon, double radiusKm) {
-        double deltaLat = radiusKm / 111.0;
-        double deltaLon = radiusKm / (111.0 * Math.cos(Math.toRadians(lat)));
+        double deltaLat = radiusKm / 111.0; //1° longitude ≈ 111 km
+        double deltaLon = radiusKm / (111.0 * Math.cos(Math.toRadians(lat))); //1° longitude ≈ 111 * cos(lat)
         return new double[]{lat - deltaLat, lat + deltaLat, lon - deltaLon, lon + deltaLon};
     }
 
