@@ -25,13 +25,13 @@ public class NotificationHelper {
          notificationManager = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager == null) return;
 
-        NotificationChannel fg = new NotificationChannel(
+        NotificationChannel forground = new NotificationChannel(
                 CHANNEL_ID_FOREGROUND,
                 "PlaneHunter Service",
                 NotificationManager.IMPORTANCE_LOW
         );
 
-        notificationManager.createNotificationChannel(fg);
+        notificationManager.createNotificationChannel(forground);
 
         NotificationChannel alerts = new NotificationChannel(CHANNEL_ID_ALERTS,
                 "Aircraft Alerts",

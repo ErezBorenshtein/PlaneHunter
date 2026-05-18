@@ -5,20 +5,20 @@ import android.os.Parcelable;
 
 public class Plane implements Parcelable {
 
-    public String icao24;
-    public String callSign;
-    public double lat;
-    public double lon;
-    public double altitude;
-    public String registration;
-    public String typeCode;
-    public String typeName;
-    public String ownerOperator;
-    public String photoUrl;
-    public double trackDeg = Double.NaN;
-    public long category = AircraftCategory.UNKNOWN;
-    public boolean isMilitary = false;
-    public String countryCode;
+    private String icao24;
+    private String callSign;
+    private double lat;
+    private double lon;
+    private double altitude;
+    private String registration;
+    private String typeCode;
+    private String typeName;
+    private String ownerOperator;
+    private String photoUrl;
+    private double trackDeg;
+    private long category;
+    private boolean isMilitary = false;
+    private String countryCode;
 
     public Plane(String icao24, String callSign, double lat, double lon, double altitude, String registration, double trackDeg, int category, String countryCode) {
         this.icao24 = icao24;
@@ -32,7 +32,7 @@ public class Plane implements Parcelable {
         this.countryCode = countryCode;
     }
 
-    protected Plane(Parcel in) {
+    private Plane(Parcel in) {
         icao24 = in.readString();
         callSign = in.readString();
         lat = in.readDouble();
@@ -45,7 +45,7 @@ public class Plane implements Parcelable {
         photoUrl = in.readString();
         trackDeg = in.readDouble();
         category = in.readLong();
-        isMilitary = in.readByte() != 0;
+        isMilitary = in.readBoolean();
         countryCode = in.readString();
     }
 
@@ -80,9 +80,8 @@ public class Plane implements Parcelable {
         dest.writeString(photoUrl);
         dest.writeDouble(trackDeg);
         dest.writeLong(category);
-        dest.writeByte((byte) (isMilitary ? 1 : 0)); //boolean doesn't work with all parcelable versions
+        dest.writeBoolean(isMilitary);
         dest.writeString(countryCode);
-        //dest.writeBoolean(isMilitary);
     }
 
     public String getIcao24() {
