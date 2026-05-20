@@ -2,6 +2,8 @@ package com.example.planehunter.ui.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.ProgressBar;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -22,6 +24,7 @@ public class Settings extends AppCompatActivity {
     private MaterialButton btnSelectAll;
     private MaterialButton btnClearAll;
     private MaterialButton btnSave;
+    private ProgressBar progressBar;
     private Map<Long, MaterialCheckBox> categoryCheckboxes;
 
     private FirebaseHandler firebaseHandler;
@@ -67,6 +70,9 @@ public class Settings extends AppCompatActivity {
         btnSelectAll = findViewById(R.id.buttonSelectAll);
         btnClearAll = findViewById(R.id.buttonClearAll);
         btnSave = findViewById(R.id.buttonSave);
+        progressBar= findViewById(R.id.progressBar);
+
+        progressBar.setVisibility(View.GONE);
 
         categoryCheckboxes = new HashMap<>();
 
@@ -88,6 +94,7 @@ public class Settings extends AppCompatActivity {
 
 
         btnSave.setOnClickListener(v -> {
+            progressBar.setVisibility(View.VISIBLE);
             ArrayList<Long> result = new ArrayList<>();
 
             for (Map.Entry<Long, MaterialCheckBox> entry : categoryCheckboxes.entrySet()) {

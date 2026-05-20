@@ -48,9 +48,7 @@ public class NotificationHelper {
                 .build();
     }
 
-    public static void showAircraftAlert(Context context,
-                             String title, String text,
-                             String icao24){
+    public static void showAircraftAlert(Context context, String title, String text, String icao24){
         Intent intent = new Intent( context ,com.example.planehunter.ui.activities.MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
