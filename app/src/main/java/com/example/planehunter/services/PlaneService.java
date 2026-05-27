@@ -33,39 +33,66 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Foreground service that periodically polls for nearby aircraft using OpenSky API.
+ * Handles location updates, data enrichment via SkyLink, and triggers notifications for interesting aircraft.
+ */
 public class PlaneService extends Service {
 
+    /** Log tag for debugging. */
     private static final String TAG = "PlaneServiceDebug";
+    /** Unique ID for the foreground notification. */
     private static final int FOREGROUND_ID = 1;
 
+    /** Intent action to update the polling interval. */
     public static final String ACTION_SET_POLL_INTERVAL = "com.example.planehunter.SET_POLL_INTERVAL";
+    /** Intent extra key for the polling interval value in milliseconds. */
     public static final String EXTRA_POLL_INTERVAL_MS = "poll_interval_ms";
 
+    /** Intent action to signal if the app is in the foreground or background. */
     public static final String ACTION_SET_APP_FOREGROUND = "com.example.planehunter.SET_APP_FOREGROUND";
+    /** Intent extra key for the app foreground state boolean. */
     public static final String EXTRA_APP_FOREGROUND = "app_foreground";
 
+    /** Default time between aircraft polls (1 minute). */
     private static final long DEFAULT_POLL_INTERVAL = 60_000L;
+    /** Minimum allowed time between aircraft polls (2 seconds). */
     private static final long MIN_POLL_INTERVAL = 2_000L;
+    /** Maximum allowed time between aircraft polls (5 minutes). */
     private static final long MAX_POLL_INTERVAL = 5 * 60_000L;
+    /** Minimum time between duplicate aircraft alerts (30 minutes). */
     private static final long AIRCRAFT_ALERT_COOLDOWN = 30 * 60 * 1000L;
+    /** Interval for updating the foreground notification text (5 minutes). */
     private static final long FOREGROUND_UPDATE = 5 * 60_000L;
 
+    /** Timestamp of the last foreground notification update. */
     private long lastForegroundUpdateMs = 0;
 
+    /** Main thread handler for scheduling polling tasks. */
     private Handler handler;
+    /** Runnable task that performs the periodic polling. */
     private Runnable task;
+    /** Client for accessing device location services. */
     private FusedLocationProviderClient locationClient;
 
-    private OpenSkyFetcher fetcher;
+    /** Fetcher for real-time aircraft state data from OpenSky. */
+    private OpenSkyFetcher openSkyFetcher;
+    /** Fetcher for additional aircraft metadata from SkyLink. */
     private SkyLinkFetcher skyLinkFetcher;
 
+    /** Current time interval between aircraft polls in milliseconds. */
     private long pollIntervalMs = DEFAULT_POLL_INTERVAL;
 
+    /** Singleton instance for Firebase data operations. */
     private FirebaseHandler firebaseHandler;
+    /** Whether the main activity is currently in the foreground. */
     private boolean isAppInForeground = false;
 
+    /** Registration for the Firestore real-time profile listener. */
     private ListenerRegistration profileListenerRegistration;
+    /** Cache of ICAO24 addresses and their last alert timestamp to prevent notification spam. */
     private final Map<String, Long> lastAlertedIcao24 = new HashMap<>();
+    /** Set of aircraft category IDs that the user has opted into for alerts. */
     private final Set<Long> selectedAlertCategories = new HashSet<>();
 
     @Override
@@ -83,12 +110,12 @@ public class PlaneService extends Service {
 ;
         locationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        fetcher = new OpenSkyFetcher();
-        fetcher.setRadiusKm(200); //!Temporary
+        openSkyFetcher = new OpenSkyFetcher();
+        openSkyFetcher.setRadiusKm(200); //!Temporary for testing
 
         String openSkyId = getString(R.string.opensky_client_id);
         String openSkySecret = getString(R.string.opensky_client_secret);
-        fetcher.setClientCredentials(openSkyId, openSkySecret);
+        openSkyFetcher.setClientCredentials(openSkyId, openSkySecret);
 
         skyLinkFetcher = new SkyLinkFetcher(getApplicationContext(), getString(R.string.skylink_key));
 
@@ -144,6 +171,10 @@ public class PlaneService extends Service {
         return null;
     }
 
+    /**
+     * Updates the polling interval, ensuring it stays within valid bounds.
+     * @param requestedMs The new interval in milliseconds.
+     */
     private void applyPollInterval(long requestedMs) {
         pollIntervalMs = Math.max(MIN_POLL_INTERVAL, Math.min(requestedMs, MAX_POLL_INTERVAL));
 
@@ -155,6 +186,9 @@ public class PlaneService extends Service {
         Log.d(TAG, "Poll interval updated to " + pollIntervalMs + " ms");
     }
 
+    /**
+     * Performs a single poll for aircraft based on the device's last known location.
+     */
     private void pollOnce() {
         if (!hasLocationPermission()) {
             Log.w(TAG, "No location permission");
@@ -181,13 +215,22 @@ public class PlaneService extends Service {
                 .addOnFailureListener(e -> Log.e(TAG, "Failed to get location", e));
     }
 
+    /**
+     * Checks if the app has the necessary location permissions.
+     * @return true if granted, false otherwise.
+     */
     private boolean hasLocationPermission() {
         return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
+    /**
+     * Fetches planes from OpenSky, enriches data with SkyLink, and broadcasts the results.
+     * @param lat User latitude.
+     * @param lon User longitude.
+     */
     private void fetchBroadcastAndUpdateFg(double lat, double lon) {
-        fetcher.fetchPlanes(lat, lon, planesFound ->{
+        openSkyFetcher.fetchPlanes(lat, lon, planesFound ->{
             if (planesFound == null){
                 Log.d(TAG,"Fetch failed, keeping last known planes");
                 return;
@@ -213,6 +256,12 @@ public class PlaneService extends Service {
         });
     }
 
+    /**
+     * Evaluates found planes and triggers notifications for those matching the user's alert criteria.
+     * @param userLat User latitude.
+     * @param userLon User longitude.
+     * @param planesFound List of planes to check.
+     */
     private void notifyForPlanes(double userLat, double userLon, ArrayList<Plane> planesFound) {
         if (planesFound == null || planesFound.isEmpty()) {
             return;
@@ -247,7 +296,7 @@ public class PlaneService extends Service {
             }
 
             double distanceKm = UtilMath.haversineMeters(planeLat, planeLon, userLat, userLon) / 1000.0;
-            if (distanceKm > fetcher.getRadiusKm()) {
+            if (distanceKm > openSkyFetcher.getRadiusKm()) {
                 continue;
             }
 
@@ -269,6 +318,11 @@ public class PlaneService extends Service {
         }
     }
 
+    /**
+     * Checks if a notification was already sent for this plane within the cooldown period.
+     * @param plane The plane to check.
+     * @return true if recently alerted, false otherwise.
+     */
     private boolean wasRecentlyAlerted(Plane plane) {
         String icao24 = plane.getIcao24();
         if (icao24 == null || icao24.trim().isEmpty()) {
@@ -283,6 +337,10 @@ public class PlaneService extends Service {
         return System.currentTimeMillis() - lastTime < AIRCRAFT_ALERT_COOLDOWN;
     }
 
+    /**
+     * Marks a plane as having been alerted to start its cooldown timer.
+     * @param plane The plane to mark.
+     */
     private void markPlaneAlerted(Plane plane) {
         String icao24 = plane.getIcao24();
         if (icao24 == null || icao24.trim().isEmpty()) {
@@ -292,6 +350,12 @@ public class PlaneService extends Service {
         lastAlertedIcao24.put(icao24, System.currentTimeMillis());
     }
 
+    /**
+     * Updates the status text of the foreground service notification.
+     * @param userLat User latitude.
+     * @param userLon User longitude.
+     * @param planesFound Current list of nearby planes.
+     */
     private void updateForeground(double userLat, double userLon, ArrayList<Plane> planesFound) {
         int count = (planesFound == null) ? 0 : planesFound.size();
         double closestKm = findClosestPlaneDistance(userLat, userLon, planesFound);
@@ -299,7 +363,7 @@ public class PlaneService extends Service {
         String title = "✈ PlaneHunter";
         String text;
 
-        int radius = (int) Math.round(fetcher.getRadiusKm());
+        int radius = (int) Math.round(openSkyFetcher.getRadiusKm());
 
         if (count == 0) {
             text = "No planes in " + radius + "km";
@@ -315,10 +379,17 @@ public class PlaneService extends Service {
         );
     }
 
+    /**
+     * Finds the distance in kilometers to the closest aircraft in the list.
+     * @param userLat User latitude.
+     * @param userLon User longitude.
+     * @param planesFound List of planes.
+     * @return Distance in km, or Double.NaN if no planes are found.
+     */
     private double findClosestPlaneDistance(double userLat, double userLon, ArrayList<Plane> planesFound) {
         if (planesFound == null || planesFound.isEmpty()) return Double.NaN;
 
-        double minKm = fetcher.getRadiusKm();
+        double minKm = openSkyFetcher.getRadiusKm();
 
         for (Plane p : planesFound) {
             if (p == null) continue;
@@ -331,9 +402,14 @@ public class PlaneService extends Service {
             if (d < minKm) minKm = d;
         }
 
-        return (minKm == fetcher.getRadiusKm()) ? Double.NaN : minKm;
+        return (minKm == openSkyFetcher.getRadiusKm()) ? Double.NaN : minKm;
     }
 
+    /**
+     * Formats a kilometer distance as a string.
+     * @param km Distance in kilometers.
+     * @return Formatted string.
+     */
     private String formatKm(double km) {
         if (Double.isNaN(km)) return "?";
         if (km < 10.0) {
@@ -342,6 +418,9 @@ public class PlaneService extends Service {
         return String.valueOf(Math.round(km));
     }
 
+    /**
+     * Subscribes to the user's Firestore profile to sync alert settings.
+     */
     private void startListeningToProfileSettings() {
         profileListenerRegistration = firebaseHandler.listenToMyProfile(new FirebaseHandler.ProfileListener() {
             @Override

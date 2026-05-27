@@ -11,6 +11,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.planehunter.R;
 import com.example.planehunter.ui.views.CaptureGameView;
 
+/**
+ * Activity that hosts the plane capture mini-game.
+ * The user attempts to "photograph" a moving plane on the screen.
+ */
 public class CaptureGameActivity extends AppCompatActivity {
 
     public static final String EXTRA_ICAO24 = "extra_icao24";
@@ -28,9 +32,6 @@ public class CaptureGameActivity extends AppCompatActivity {
         captureView = findViewById(R.id.captureView);
         ImageButton btnShutter = findViewById(R.id.btnShutter);
 
-        //String icao24 = getIntent().getStringExtra(EXTRA_ICAO24);
-        //String callsign = getIntent().getStringExtra(EXTRA_CALLSIGN);
-
         btnShutter.setOnClickListener(v -> onShutterPressed());
     }
 
@@ -46,6 +47,10 @@ public class CaptureGameActivity extends AppCompatActivity {
         captureView.stopGame();
     }
 
+    /**
+     * Logic executed when the user presses the shutter button.
+     * Determines if the plane was hit and returns the result to the calling activity.
+     */
     private void onShutterPressed() {
 
         boolean hit = captureView.tryCapture();

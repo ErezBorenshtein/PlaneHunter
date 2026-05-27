@@ -17,31 +17,49 @@ import com.example.planehunter.R;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Custom View that implements the plane capture mini-game animation and logic.
+ * A plane flies across the screen, and the user must tap the shutter when the plane is within the target area.
+ */
 public class CaptureGameView extends View {
 
 
+    /** The size of the capture target area in density-independent pixels. */
     private static final float TARGET_SIZE_DP = 100f;
+    /** The size of the plane icon in density-independent pixels. */
     private static final float PLANE_SIZE_DP  = 44f;
 
+    /** The speed at which the plane moves across the screen in pixels per second. */
     private float speedPxPerSec = 650f;
 
+    /** Flag indicating whether the game animation is currently active. */
     private boolean running = false;
+    /** The timestamp of the last processed animation frame in milliseconds. */
     private long lastFrameMs = 0;
 
+    /** The current X coordinate of the plane's center point. */
     private float planeX;
+    /** The current Y coordinate of the plane's center point. */
     private float planeY;
 
+    /** The plane's velocity vector along the X axis. */
     private float velX;
+    /** The plane's velocity vector along the Y axis. */
     private float velY;
-    private float planeAngleDeg = 0f; // Rotation angle in degrees (0 = pointing right)
+    /** The rotation angle of the plane icon in degrees (0 degrees points to the right). */
+    private float planeAngleDeg = 0f;
 
+    /** The rectangle defining the bounds of the capture target area. */
     private final RectF targetRect = new RectF();
 
-    //paints
+    /** Paint used to draw the solid background of the game view. */
     private final Paint paintBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** Paint used to draw the boundary of the target area. */
     private final Paint paintTarget = new Paint(Paint.ANTI_ALIAS_FLAG);
 
+    /** The original unscaled bitmap resource for the plane. */
     private Bitmap planeBmpOriginal;
+    /** The bitmap for the plane, scaled to the appropriate size for the game. */
     private Bitmap planeBmpScaled;
 
 
@@ -49,6 +67,9 @@ public class CaptureGameView extends View {
     public CaptureGameView(Context context, @Nullable AttributeSet attrs) { super(context, attrs); init(); }
     public CaptureGameView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) { super(context, attrs, defStyleAttr); init(); }
 
+    /**
+     * Initializes paints and loads the plane bitmap.
+     */
     private void init() {
 
         //background
@@ -65,6 +86,9 @@ public class CaptureGameView extends View {
         planeBmpScaled = scaleToSize(planeBmpOriginal, PLANE_SIZE_DP);
     }
 
+    /**
+     * Starts the game animation.
+     */
     public void startGame() {
         running = true;
         lastFrameMs = 0;
@@ -79,11 +103,17 @@ public class CaptureGameView extends View {
         postInvalidateOnAnimation();
     }
 
+    /**
+     * Stops the game animation.
+     */
     public void stopGame() {
         running = false;
     }
 
-    //checks if the plane is in the target
+    /**
+     * Checks if the plane is currently within the target area.
+     * @return true if the plane is "captured", false otherwise.
+     */
     public boolean tryCapture() {
         return RectF.intersects(targetRect, getPlaneRect());
     }
@@ -104,6 +134,9 @@ public class CaptureGameView extends View {
         if (running) postInvalidateOnAnimation();
     }
 
+    /**
+     * Updates the plane's position based on its velocity and the elapsed time.
+     */
     private void updateMotionWrap() {
 
         long now = SystemClock.uptimeMillis();
@@ -126,6 +159,10 @@ public class CaptureGameView extends View {
         }
     }
 
+    /**
+     * Renders the plane bitmap with proper rotation at its current coordinates.
+     * @param canvas The canvas to draw on.
+     */
     private void drawPlane(Canvas canvas) {
 
         Bitmap bmp = planeBmpScaled;
@@ -178,6 +215,9 @@ public class CaptureGameView extends View {
         //resetRandomPassThroughTarget();
     }
 
+    /**
+     * Calculates the target rectangle based on the view dimensions.
+     */
     private void rebuildTargetRect(int w, int h) {
 
         float size = TARGET_SIZE_DP;
@@ -188,6 +228,9 @@ public class CaptureGameView extends View {
     }
 
 
+    /**
+     * Randomizes a new flight path for the plane that passes through the target area.
+     */
     private void resetRandomPassThroughTarget() {
 
         float half = getPlaneHalfSizePx();

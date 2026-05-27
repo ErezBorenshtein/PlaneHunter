@@ -13,6 +13,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.planehunter.R;
 import com.example.planehunter.data.firebase.FirebaseHandler;
 
+/**
+ * Activity for user authentication (Login).
+ * Handles email and password input and directs existing users to the main screen.
+ */
 public class LogIn extends AppCompatActivity {
 
     private EditText etEmail;
@@ -37,6 +41,9 @@ public class LogIn extends AppCompatActivity {
         );
     }
 
+    /**
+     * Validates input and attempts to sign in the user via Firebase.
+     */
     private void doLogin() {
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString();

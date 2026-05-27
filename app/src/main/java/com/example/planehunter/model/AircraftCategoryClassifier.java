@@ -5,11 +5,23 @@ import androidx.annotation.Nullable;
 
 import java.util.Locale;
 
+/**
+ * Utility class to classify aircraft into categories based on their type code,
+ * type name, and owner/operator information.
+ */
 public final class AircraftCategoryClassifier {
 
     private AircraftCategoryClassifier() {
     }
 
+    /**
+     * Classifies an aircraft into a category.
+     * @param typeCode The ICAO type code (e.g., "B738").
+     * @param typeName The descriptive type name (e.g., "Boeing 737-800").
+     * @param ownerOperator The name of the owner or operator.
+     * @param isMilitary Flag indicating if the aircraft is military.
+     * @return The classified AircraftCategory ID.
+     */
     public static long classify(
             @Nullable String typeCode,
             @Nullable String typeName,
@@ -149,6 +161,12 @@ public final class AircraftCategoryClassifier {
                 "E17", "E18", "E19", "E29", "BCS");
     }
 
+    /**
+     * Checks if a string starts with any of the given prefixes.
+     * @param source The string to check.
+     * @param prefixes The prefixes to check against.
+     * @return true if the string starts with any of the prefixes, false otherwise.
+     */
     private static boolean startsWithAny(@NonNull String source, @NonNull String... prefixes) {
         for (String prefix : prefixes) {
             if (source.startsWith(prefix)) {
@@ -158,6 +176,12 @@ public final class AircraftCategoryClassifier {
         return false;
     }
 
+    /**
+     * Checks if a string ends with any of the given suffixes.
+     * @param source
+     * @param suffixes
+     * @return true if the string ends with any of the suffixes, false otherwise.
+     */
     private static boolean endsWithAny(@NonNull String source, @NonNull String... suffixes) {
         for (String suffix : suffixes) {
             if (source.endsWith(suffix)) {
@@ -167,6 +191,12 @@ public final class AircraftCategoryClassifier {
         return false;
     }
 
+    /**
+     * Checks if a string contains any of the given values.
+     * @param source
+     * @param values
+     * @return true if the string contains any of the values, false otherwise.
+     */
     private static boolean containsAny(@NonNull String source, @NonNull String... values) {
         for (String value : values) {
             if (source.contains(value)) {

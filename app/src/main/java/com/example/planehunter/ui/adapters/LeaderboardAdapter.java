@@ -14,13 +14,24 @@ import com.example.planehunter.model.LeaderboardEntry;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Adapter for displaying a list of leaderboard entries in a RecyclerView.
+ * Highlights the top three ranks with distinct colors.
+ */
 public class LeaderboardAdapter extends RecyclerView.Adapter<LeaderboardAdapter.ViewHolder> {
 
+    /**
+     * ViewHolder for leaderboard items.
+     */
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView textRank;
-        TextView textName;
-        TextView textXp;
-        TextView textCaptures;
+        /** View displaying the user's rank. */
+        public TextView textRank;
+        /** View displaying the user's name. */
+        public TextView textName;
+        /** View displaying the user's total XP. */
+        public TextView textXp;
+        /** View displaying the user's total capture count. */
+        public TextView textCaptures;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -31,8 +42,13 @@ public class LeaderboardAdapter extends RecyclerView.Adapter<LeaderboardAdapter.
         }
     }
 
+    /** The list of leaderboard entries to display. */
     private final List<LeaderboardEntry> entries = new ArrayList<>();
 
+    /**
+     * Updates the data set and refreshes the adapter.
+     * @param entryList The new list of leaderboard entries.
+     */
     public void setItems (List<LeaderboardEntry> entryList){
         entries.clear();
         entries.addAll(entryList);
@@ -59,6 +75,11 @@ public class LeaderboardAdapter extends RecyclerView.Adapter<LeaderboardAdapter.
 
     }
 
+    /**
+     * Sets the visual style (background and text color) for the rank circle based on position.
+     * @param holder The ViewHolder.
+     * @param position The position in the list.
+     */
     private void setRankStyle(ViewHolder holder, int position) {
 
         int bgColor;

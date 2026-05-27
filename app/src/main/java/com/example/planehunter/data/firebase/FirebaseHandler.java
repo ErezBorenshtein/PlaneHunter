@@ -30,27 +30,37 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
+/**
+ * Singleton class that handles all Firebase operations, including Authentication and Firestore.
+ * Manages user profiles, leaderboard data, and aircraft capture logic.
+ */
 public class FirebaseHandler {
 
-    //volatile prevents instruction reordering and ensures the instance
-    //is fully initialized before being accessed by other threads
+    /** Singleton instance. */
     private static volatile FirebaseHandler instance;
 
-
+    /** Cooldown period for capturing the same aircraft (30 minutes). */
     private static final long CAPTURE_COOLDOWN_MS = 30L * 60L * 1000L;
 
+    /** XP awarded for Tier 1 aircraft. */
     private static final long XP_TIER_1 = 1000L;
+    /** XP awarded for Tier 2 aircraft. */
     private static final long XP_TIER_2 = 1300L;
+    /** XP awarded for Tier 3 aircraft. */
     private static final long XP_TIER_3 = 1600L;
+    /** XP awarded for Tier 4 aircraft. */
     private static final long XP_TIER_4 = 2000L;
+    /** XP awarded for Tier 5 aircraft. */
     private static final long XP_TIER_5 = 2600L;
 
+    /** Multiplier for the first time an aircraft is captured. */
     private static final double FIRST_TIME_MULTIPLIER = 2.0;
+    /** Multiplier for repeat captures of the same aircraft. */
     private static final double REPEAT_MULTIPLIER = 0.3;
 
-
-
+    /** Firebase Auth instance. */
     private final FirebaseAuth auth;
+    /** Firebase Firestore instance. */
     private final FirebaseFirestore db;
 
     private FirebaseHandler() {
@@ -58,6 +68,10 @@ public class FirebaseHandler {
         db = FirebaseFirestore.getInstance();
     }
 
+    /**
+     * Returns the singleton instance of FirebaseHandler.
+     * @return The FirebaseHandler instance.
+     */
     public static FirebaseHandler getInstance() {
         if (instance == null) {
             synchronized (FirebaseHandler.class) {
@@ -69,42 +83,66 @@ public class FirebaseHandler {
         return instance;
     }
 
+    /**
+     * Represents the result of an XP award operation for a plane capture.
+     */
     public static class CaptureAwardResult {
+        /** Whether XP was successfully awarded. */
         public boolean awarded;
+        /** Whether this was the first time the aircraft was captured. */
         public boolean firstTime;
+        /** Whether the capture failed due to an active cooldown. */
         public boolean cooldownActive;
+        /** The amount of XP awarded in this operation. */
         public long xpAwarded;
+        /** The remaining time in the cooldown in milliseconds. */
         public long cooldownRemainingMs;
 
         public CaptureAwardResult() {
         }
     }
 
+    /**
+     * Interface for listening to user profile changes.
+     */
     public interface ProfileListener {
         void onProfile(@Nullable UserProfile profile);
         void onError(@NonNull Exception e);
     }
 
-    //to show the rank
+    /**
+     * Interface for receiving the current user's rank on the leaderboard.
+     */
     public interface MyRankListener {
         void onSuccess(@NonNull LeaderboardEntry entry, long rank);
         void onError(@NonNull Exception e);
     }
 
+    /**
+     * Checks if a user is currently signed in.
+     * @return true if a user is signed in, false otherwise.
+     */
     public boolean isSignedIn() {
         return auth.getCurrentUser() != null;
     }
 
+    /**
+     * Gets the current user's UID or null if not signed in.
+     * @return The UID string or null.
+     */
     @Nullable
     public String getUidOrNull() {
-        //when user can be null
         FirebaseUser user = auth.getCurrentUser();
         return user == null ? null : user.getUid();
     }
 
+    /**
+     * Gets the current user's UID or throws an exception if not signed in.
+     * @return The UID string.
+     * @throws IllegalStateException if the user is not signed in.
+     */
     @NonNull
     public String getUidOrThrow() {
-        //when user can't be null
         String uid = getUidOrNull();
         if (uid == null) {
             throw new IllegalStateException("Not signed-in");
@@ -112,14 +150,29 @@ public class FirebaseHandler {
         return uid;
     }
 
+    /**
+     * Signs up a new user with email and password.
+     * @param email User email.
+     * @param password User password.
+     * @return A Task representing the sign-up operation.
+     */
     public Task<AuthResult> signUpEmail(@NonNull String email, @NonNull String password) {
         return auth.createUserWithEmailAndPassword(email, password);
     }
 
+    /**
+     * Signs in an existing user with email and password.
+     * @param email User email.
+     * @param password User password.
+     * @return A Task representing the sign-in operation.
+     */
     public Task<AuthResult> signInEmail(@NonNull String email, @NonNull String password) {
         return auth.signInWithEmailAndPassword(email, password);
     }
 
+    /**
+     * Signs out the current user.
+     */
     public void signOut() {
         auth.signOut();
     }
@@ -132,21 +185,28 @@ public class FirebaseHandler {
         return db.collection("leaderboard").document(getUidOrThrow());
     }
 
+    /**
+     * Ensures that a default profile exists for the user. Creates one if it doesn't.
+     * @param displayName The display name to use for a new profile.
+     * @return A Task representing the operation.
+     */
     public Task<Void> ensureDefaultProfile(@NonNull String displayName) {
         return myUserDoc().get().continueWithTask(task -> {
             DocumentSnapshot doc = task.getResult();
 
-            //if already exists, return
             if (doc != null && doc.exists()) {
                 return Tasks.forResult(null);
             }
 
-            //else create new profile in Firebase
             UserProfile profile = new UserProfile(getUidOrThrow(), displayName);
             return myUserDoc().set(profile);
         });
     }
 
+    /**
+     * Retrieves the current user's profile.
+     * @return A Task containing the UserProfile.
+     */
     public Task<UserProfile> getMyProfile() {
         return myUserDoc().get().continueWith(task -> {
             DocumentSnapshot doc = task.getResult();
@@ -159,16 +219,25 @@ public class FirebaseHandler {
         });
     }
 
+    /**
+     * Updates the categories for which the user wants to receive alerts.
+     * @param alertCategories List of category IDs.
+     * @return A Task representing the operation.
+     */
     public Task<Void> updateAlertCategories(@NonNull ArrayList<Long> alertCategories) {
         UserProfile profile = new UserProfile();
         profile.alertCategories = new ArrayList<>(alertCategories);
         profile.updatedAtMs = System.currentTimeMillis();
 
-        return myUserDoc().set(profile, SetOptions.merge()); //updates only the alert categories
+        return myUserDoc().set(profile, SetOptions.merge());
     }
 
+    /**
+     * Starts listening to changes in the current user's profile.
+     * @param listener The listener to be notified of changes.
+     * @return A ListenerRegistration that can be used to stop listening.
+     */
     public ListenerRegistration listenToMyProfile(@NonNull ProfileListener listener) {
-        //listens to changes in real time
         return myUserDoc().addSnapshotListener(new EventListener<DocumentSnapshot>() {
             @Override
             public void onEvent(@Nullable DocumentSnapshot value, @Nullable FirebaseFirestoreException error) {
@@ -187,6 +256,11 @@ public class FirebaseHandler {
         });
     }
 
+    /**
+     * Processes a plane capture, awarding XP if the cooldown has passed.
+     * @param plane The plane being captured.
+     * @return A Task containing the CaptureAwardResult.
+     */
     public Task<CaptureAwardResult> awardCaptureXp(@NonNull Plane plane) {
         String uid = getUidOrThrow();
         long now = System.currentTimeMillis();
@@ -194,9 +268,6 @@ public class FirebaseHandler {
         String captureKey = buildCaptureKey(plane);
         long baseXp = resolveXpByCategory(plane.getCategory());
 
-
-        //run the capture award logic in a Firestore transaction so the cooldown check,
-        //XP update, capture record, and leaderboard update are calculated and written as one unit.
         return db.runTransaction(transaction -> {
             DocumentReference userRef = db.collection("users").document(uid);
             DocumentReference captureRef = userRef.collection("captures").document(captureKey);
@@ -214,7 +285,6 @@ public class FirebaseHandler {
                 long lastCaughtAtMs = getLong(captureSnap, "lastCaughtAtMs");
                 long elapsedMs = now - lastCaughtAtMs;
 
-                //if in cooldown, don't award XP
                 if (elapsedMs < CAPTURE_COOLDOWN_MS) {
                     result.awarded = false;
                     result.firstTime = false;
@@ -253,10 +323,13 @@ public class FirebaseHandler {
         });
     }
 
+    /**
+     * Converts a DocumentSnapshot to a LeaderboardEntry.
+     * @param doc The DocumentSnapshot.
+     * @return The LeaderboardEntry.
+     */
     @Nullable
     public LeaderboardEntry toLeaderboardEntry(@NonNull DocumentSnapshot doc) {
-        //convert DocumentSnapshot to LeaderboardEntry
-
         LeaderboardEntry entry = doc.toObject(LeaderboardEntry.class);
 
         if (entry == null) {
@@ -271,8 +344,11 @@ public class FirebaseHandler {
     }
 
 
+    /**
+     * Retrieves the current user's rank.
+     * @param listener The listener.
+     */
     public void getMyLeaderboardRank(@NotNull MyRankListener listener){
-
         myLeaderboardDoc().get()
                 .addOnSuccessListener(doc->{
                    if(!doc.exists()){
@@ -292,20 +368,21 @@ public class FirebaseHandler {
                    };
 
                    db.collection("leaderboard").whereGreaterThan("xp",xp)
-                           .get() //gets all the users sith more XP than you
+                           .get()
                            .addOnSuccessListener(aboveQuery->{
-                               long rank = aboveQuery.size() +1L; //size +1 = your rank
+                               long rank = aboveQuery.size() +1L;
                                listener.onSuccess(entry,rank);
                            })
                            .addOnFailureListener(listener::onError);
                 })
                 .addOnFailureListener(listener::onError);
-
     }
 
+    /**
+     * Retrieves planes in cooldown.
+     * @return A set of ICAO24 strings.
+     */
     public Task<Set<String>> getMyPlanesInCooldown() {
-        //for showing the planes in cooldown in gray
-
         long now = System.currentTimeMillis();
 
         return myUserDoc()
@@ -321,7 +398,6 @@ public class FirebaseHandler {
                     }
 
                     for (DocumentSnapshot doc : task.getResult().getDocuments()) {
-                        //for each plane check if in cooldown
                         long lastCaughtAtMs = getLong(doc, "lastCaughtAtMs");
                         long elapsedMs = now - lastCaughtAtMs;
 
@@ -341,6 +417,11 @@ public class FirebaseHandler {
                 });
     }
 
+    /**
+     * Gets top leaderboard entries.
+     * @param limit The limit.
+     * @return The query.
+     */
     public Query getLeaderboardTop(int limit) {
         return db.collection("leaderboard")
                 .orderBy("xp", Query.Direction.DESCENDING)

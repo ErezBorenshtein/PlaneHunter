@@ -19,19 +19,40 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Adapter for a list of planes used in a selection dialog.
+ * Shows plane details and applies a grayscale filter to planes that are currently in cooldown.
+ */
 public class PlaneChooserAdapter extends RecyclerView.Adapter<PlaneChooserAdapter.PlaneViewHolder> {
 
+    /** Set of ICAO24 addresses for planes that are currently in cooldown for the user. */
     private final Set<String> cooldownIcaos;
 
+    /** Color filter used to grayscale icons of planes in cooldown. */
     private final ColorMatrixColorFilter grayFilter;
 
+    /**
+     * Interface for listening to plane selection events.
+     */
     public interface Listener {
+        /**
+         * Called when a plane item is clicked.
+         * @param plane The clicked plane.
+         */
         void onPlaneClicked(Plane plane);
     }
 
+    /** The list of planes to be displayed in the chooser. */
     private final ArrayList<Plane> planes;
+    /** The listener for plane selection events. */
     private final Listener listener;
 
+    /**
+     * Constructs a new PlaneChooserAdapter.
+     * @param planes The list of planes to display.
+     * @param cooldownIcaos Set of ICAO24 addresses for planes in cooldown.
+     * @param listener The selection listener.
+     */
     public PlaneChooserAdapter(ArrayList<Plane> planes, Set<String> cooldownIcaos, Listener listener) {
         this.planes = planes == null ? new ArrayList<>() : planes;
         this.cooldownIcaos = cooldownIcaos == null ? new HashSet<>() : cooldownIcaos;
@@ -155,11 +176,17 @@ public class PlaneChooserAdapter extends RecyclerView.Adapter<PlaneChooserAdapte
         return value == null || value.trim().isEmpty();
     }
 
+    /**
+     * ViewHolder for plane items in the chooser.
+     */
     static class PlaneViewHolder extends RecyclerView.ViewHolder {
 
+        /** TextView for the plane's title (Callsign, Registration, or ICAO). */
         TextView textTitle;
+        /** TextView for the plane's subtitle (Type and Altitude). */
         TextView textSubtitle;
 
+        /** ImageView for the plane's category icon. */
         ImageView imagePlaneIcon;
 
         public PlaneViewHolder(@NonNull View itemView) {

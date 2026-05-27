@@ -28,31 +28,82 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Enrichment service that fetches additional aircraft details (registration, type, owner, photo)
+ * from the SkyLink API. Implements multi-level caching (memory and SharedPreferences).
+ */
 public class SkyLinkFetcher {
 
+    /** Tag used for logging. */
     private static final String TAG = "SkyLinkFetcher";
+    /** Name of the SharedPreferences file for caching. */
     private static final String PREFS_NAME = "skylink_aircraft_cache";
+    /** Prefix for aircraft keys in SharedPreferences. */
     private static final String PREF_KEY_PREFIX = "aircraft_";
+    /** Maximum number of API lookups allowed in a single batch. */
     private static final int MAX_LOOKUPS_PER_BATCH = 3;
+    /** The SkyLink API key. */
     private final String apiKey;
+    /** SharedPreferences instance for persistent caching. */
     private final SharedPreferences prefs;
-    private final Handler mainHandler = new Handler(Looper.getMainLooper()); //handler for main(UI) thread
+    /** Handler for posting results to the main thread. */
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** Lock object for synchronizing cache access. */
     private final Object cacheLock = new Object();
 
+    /** In-memory cache for aircraft data. */
     private final Map<String, AircraftData> memoryCache = new HashMap<>();
-    private final Set<String> negativeCache = new HashSet<>(); //planes we searched that returned nothing
+    /** Set of ICAO identifiers that returned no data from the API. */
+    private final Set<String> negativeCache = new HashSet<>();
+    /** Set of ICAO identifiers currently being fetched. */
     private final Set<String> inFlight = new HashSet<>();
 
+    /**
+     * Callback interface to signal completion of an enrichment task.
+     */
     public interface DoneCallback {
+        /**
+         * Called on the main thread when enrichment is complete.
+         */
         void onDone();
     }
 
+    /**
+     * Data object for aircraft details.
+     */
+    private static class AircraftData {
+        /** Aircraft registration number. */
+        String registration;
+        /** ICAO type code. */
+        String typeCode;
+        /** Descriptive type name. */
+        String typeName;
+        /** Owner or operator name. */
+        String ownerOperator;
+        /** URL to aircraft photo. */
+        String photoUrl;
+        /** Whether the aircraft is military. */
+        boolean isMilitary;
+        /** Aircraft category ID. */
+        long category = AircraftCategory.UNKNOWN;
+    }
+
+    /**
+     * Constructs a new SkyLinkFetcher.
+     * @param context Application context for SharedPreferences.
+     * @param apiKey API key for the SkyLink RapidAPI service.
+     */
     public SkyLinkFetcher(@NonNull Context context, @Nullable String apiKey) {
         Context appContext = context.getApplicationContext();
         this.apiKey = apiKey == null ? "" : apiKey;
         this.prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
+    /**
+     * Enriches a list of planes with metadata from SkyLink. Limits lookups to avoid API rate limiting.
+     * @param planes The list of planes to enrich.
+     * @param callback Callback notified when finished.
+     */
     public void enrichPlanesData(@Nullable ArrayList<Plane> planes, @NonNull DoneCallback callback) {
         new Thread(() -> {
             try {
@@ -72,7 +123,6 @@ public class SkyLinkFetcher {
                     applyCachedDataToPlane(plane);
 
                     if (!needsDataForClassification(plane)) {
-                        //no need to create API request if data exists already
                         continue;
                     }
 
@@ -93,7 +143,7 @@ public class SkyLinkFetcher {
                         continue;
                     }
 
-                    AircraftData data = fetchDataSync(icao, false); //fetch without photo because it takes too long
+                    AircraftData data = fetchDataSync(icao, false);
                     lookedUpNow.add(icao);
                     lookupsDone++;
 
@@ -101,12 +151,6 @@ public class SkyLinkFetcher {
                         applyDataToPlane(plane, data);
                     }
                 }
-                //
-                //for (Plane plane : planes) {
-                //    if (plane != null) {
-                //        applyCachedDataToPlane(plane);
-                //    }
-                //}
 
             } catch (Exception e) {
                 Log.e(TAG, "enrichPlanesAsync failed", e);
@@ -116,6 +160,11 @@ public class SkyLinkFetcher {
         }).start();
     }
 
+    /**
+     * Enriches a single plane with full metadata including photo URL, suitable for detail sheets.
+     * @param plane The plane to enrich.
+     * @param callback Callback notified when finished.
+     */
     public void enrichPlaneForSheetAsync(@Nullable Plane plane, @NonNull DoneCallback callback) {
         new Thread(() -> {
             try {
@@ -160,6 +209,10 @@ public class SkyLinkFetcher {
                 || plane.getCategory() == AircraftCategory.UNKNOWN;
     }
 
+    /**
+     * Fetches cached data for a given plane.
+     * @param plane The plane to fetch data for.
+     */
     private void applyCachedDataToPlane(@NonNull Plane plane) {
         String icao = normalizeIcao(plane.getIcao24());
         if (icao == null) {
@@ -187,7 +240,7 @@ public class SkyLinkFetcher {
     @Nullable
     private AircraftData fetchDataSync(@NonNull String icao, boolean includePhoto) {
         AircraftData cached = getCacheEntry(icao);
-        if (cached != null && (!includePhoto || !isBlank(cached.photoUrl))) { //if cached and we don't need photo, use it or already have photo URL
+        if (cached != null && (!includePhoto || !isBlank(cached.photoUrl))) {
             return cached;
         }
 
@@ -211,13 +264,6 @@ public class SkyLinkFetcher {
         HttpURLConnection connection = null;
 
         try {
-            /*
-                curl --request GET \
-	            --url 'https://skylink-api.p.rapidapi.com/aircraft/icao24/%7Bicao24%7D?photos=true' \
-	            --header 'Content-Type: application/json' \
-	            --header 'x-rapidapi-host: skylink-api.p.rapidapi.com' \
-	            --header 'x-rapidapi-key: YOU_API_KEY'
-             */
             String url = "https://skylink-api.p.rapidapi.com/aircraft/icao24/" + icao + "?photos=" + includePhoto;
 
             connection = (HttpURLConnection) new URL(url).openConnection();
@@ -234,14 +280,10 @@ public class SkyLinkFetcher {
             if(code >= 200 && code < 300){
                 inputStream =connection.getInputStream();
                 body = readAll(inputStream);
-                Log.d(TAG, "SkyLink URL=" + url);
-                Log.d(TAG, "SkyLink code=" + code + " body=" + body);
             }
             else{
                 inputStream =connection.getErrorStream();
                 body = readAll(inputStream);
-                Log.d(TAG, "SkyLink URL=" + url);
-                Log.d(TAG, "SkyLink code=" + code + " body=" + body);
                 return cachedFromPrefs;
             }
 
@@ -363,6 +405,10 @@ public class SkyLinkFetcher {
         }
     }
 
+    /**
+     * Ensures the plane has a valid category.
+     * @param plane The plane to ensure.
+     */
     private void ensureCategory(@NonNull Plane plane) {
         long category = AircraftCategoryClassifier.classify(
                 plane.getTypeCode(),
@@ -492,6 +538,11 @@ public class SkyLinkFetcher {
         }
     }
 
+    /**
+     * Marks the plane as in flight.
+     * @param icao ICAO of the plane.
+     * @return True if not already in flight.
+     */
     private boolean tryMarkInFlight(@NonNull String icao) {
         synchronized (cacheLock) {
             if (inFlight.contains(icao)) {
@@ -507,15 +558,5 @@ public class SkyLinkFetcher {
         synchronized (cacheLock) {
             inFlight.remove(icao);
         }
-    }
-
-    private static class AircraftData {
-        String registration;
-        String typeCode;
-        String typeName;
-        String ownerOperator;
-        String photoUrl;
-        boolean isMilitary;
-        long category = AircraftCategory.UNKNOWN;
     }
 }

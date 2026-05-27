@@ -23,34 +23,61 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Locale;
 
+/**
+ * Fetches real-time aircraft state vectors from the OpenSky Network API.
+ * Handles authentication via OAuth2 and manages token caching.
+ */
 public class OpenSkyFetcher {
 
+    /** Log tag. */
     private static final String TAG = "OpenSkyFetcher";
 
+    /** OpenSky OAuth2 token URL. */
     private static final String TOKEN_URL =
             "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
 
+    /**
+     * Callback interface for plane fetching results.
+     */
     public interface PlanesCallback {
+        /**
+         * Called when planes have been successfully fetched and filtered.
+         * @param planes The list of fetched Plane objects.
+         */
         void onPlanesFetched(ArrayList<Plane> planes);
     }
 
+    /** Radius in kilometers to search for aircraft around the user's location. */
     private double radiusKm = 30.0;
 
+    /** OAuth2 Client ID for OpenSky API access. */
     private String clientId = null;
+    /** OAuth2 Client Secret for OpenSky API access. */
     private String clientSecret = null;
 
-    //protects the cached token so two threads will not update it at the same time
+    /** Synchronizes access to the cached token. */
     private final Object tokenLock = new Object();
 
+    /** Cached OAuth2 access token. */
     private String cachedToken = null;
+    /** Expiry time of the cached token in milliseconds. */
     private long tokenExpiryMs = 0;
 
-    //object used to keep the token value together with its expiration time
+    /**
+     * Data object for the token response from OpenSky.
+     */
     private static class TokenResponse {
+        /** The access token string. */
         String accessToken;
+        /** The token's time-to-live in seconds. */
         int expiresInSec;
     }
 
+    /**
+     * Sets the client credentials for OpenSky Network API authentication.
+     * @param clientId The client ID.
+     * @param clientSecret The client secret.
+     */
     public void setClientCredentials(String clientId, String clientSecret) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
@@ -60,6 +87,13 @@ public class OpenSkyFetcher {
         }
     }
 
+    /**
+     * Fetches planes within a certain radius of the specified coordinates.
+     * Performs the network request on a background thread and returns results via callback on the main thread.
+     * @param latCenter Latitude of the center point.
+     * @param lonCenter Longitude of the center point.
+     * @param callback Callback to receive the results.
+     */
     public void fetchPlanes(double latCenter, double lonCenter, PlanesCallback callback) {
         new Thread(() -> {
             ArrayList<Plane> planes = new ArrayList<>();
@@ -77,8 +111,8 @@ public class OpenSkyFetcher {
 
                 HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
                 connection.setRequestMethod("GET");
-                connection.setConnectTimeout(8000); //8 minutes
-                connection.setReadTimeout(8000);   //8 minutes
+                connection.setConnectTimeout(8000); //8 secs
+                connection.setReadTimeout(8000);   //8 secs
 
                 String token = getValidToken();
                 if (token != null && !token.isEmpty()) {
@@ -181,6 +215,11 @@ public class OpenSkyFetcher {
         }).start();
     }
 
+    /**
+     * Gets the country code for a given country name.
+     * @param countryName The name of the country.
+     * @return The country code or null if not found.
+     */
     private String getCountryCode(String countryName) {
         //https://www.javamadesoeasy.com/2016/10/display-name-of-all-countries-with.html
         for (String countryCode : Locale.getISOCountries()) {
@@ -192,6 +231,10 @@ public class OpenSkyFetcher {
         return null;
     }
 
+    /**
+     * Gets a valid token from the OpenSky Network API.
+     * @return The token string or null if not available.
+     */
     private String getValidToken() {
         if (clientId == null || clientSecret == null) return null;
 
@@ -213,6 +256,12 @@ public class OpenSkyFetcher {
         }
     }
 
+    /**
+     * Fetches a token from the OpenSky Network API.
+     * @param clientId The Client ID.
+     * @param clientSecret The Client Secret.
+     * @return The TokenResponse object or null if failed.
+     */
     private TokenResponse fetchToken(String clientId, String clientSecret) {
         //https://openskynetwork.github.io/opensky-api/rest.html#all-state-vectors
         HttpURLConnection connection = null;
@@ -280,10 +329,21 @@ public class OpenSkyFetcher {
         }
     }
 
+    /**
+     * Posts the result to the UI thread.
+     * @param callback Callback to receive the results.
+     * @param planes The list of fetched Plane objects.
+     */
     private void postResult(PlanesCallback callback, ArrayList<Plane> planes) {
         new Handler(Looper.getMainLooper()).post(() -> callback.onPlanesFetched(planes)); //returns data to UI thread
     }
 
+    /**
+     * Reads all data from an InputStream.
+     * @param inputStream The InputStream to read.
+     * @return The data as a String.
+     * @throws IOException if read fails.
+     */
     private String readAll(InputStream inputStream) throws IOException {
         if (inputStream == null) return "";
         BufferedReader input = new BufferedReader(new InputStreamReader(inputStream));
@@ -296,6 +356,11 @@ public class OpenSkyFetcher {
         return stringBuilder.toString();
     }
 
+    /**
+     * Cleans a string by removing leading/trailing whitespace.
+     * @param s The string to clean.
+     * @return The cleaned string.
+     */
     private String cleanString(String s) {
         if (s == null) return "";
 
@@ -303,6 +368,13 @@ public class OpenSkyFetcher {
         return trimmed.isEmpty() ? "" : trimmed;
     }
 
+    /**
+     * Calculates the bounding box for a given center point and radius.
+     * @param lat Latitude of the center point.
+     * @param lon Longitude of the center point.
+     * @param radiusKm Radius in kilometers.
+     * @return An array containing the bounding box coordinates.
+     */
     private double[] boundingBox(double lat, double lon, double radiusKm) {
         double deltaLat = radiusKm / 111.0; //1° longitude ≈ 111 km
         double deltaLon = radiusKm / (111.0 * Math.cos(Math.toRadians(lat))); //1° longitude ≈ 111 * cos(lat)

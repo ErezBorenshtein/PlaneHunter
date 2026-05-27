@@ -25,20 +25,41 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
 import java.util.Locale;
 
+/**
+ * A bottom sheet that displays detailed information about a specific aircraft.
+ * It displays real-time flight data, aircraft metadata, and an image of the plane.
+ */
 public class PlaneSheet extends BottomSheetDialogFragment {
 
+    /**
+     * Interface for listening to actions within the plane sheet.
+     */
     public interface Listener {
+        /**
+         * Called when the user clicks the capture button.
+         * @param plane The plane being captured.
+         */
         void onCapturePressed(@NonNull Plane plane);
     }
 
+    /** Key for the plane object passed as an argument. */
     private static final String ARG_PLANE = "plane";
 
+    /** The plane being displayed in this sheet. */
     private Plane plane;
+    /** Listener for actions taken in this sheet. */
     private Listener listener;
+    /** Fetcher for retrieving additional aircraft data from the SkyLink API. */
     private SkyLinkFetcher skyLinkFetcher;
 
+    /** Flag indicating if aircraft metadata is currently being loaded from an external API. */
     private boolean isLoadingAircraftInfo = false;
 
+    /**
+     * Creates a new instance of PlaneSheet for a specific plane.
+     * @param plane The plane to display.
+     * @return A new PlaneSheet instance.
+     */
     public static PlaneSheet newInstance(@NonNull Plane plane) {
         PlaneSheet sheet = new PlaneSheet();
 
@@ -48,6 +69,10 @@ public class PlaneSheet extends BottomSheetDialogFragment {
         return sheet;
     }
 
+    /**
+     * Sets the listener for plane sheet events.
+     * @param listener The listener to set.
+     */
     public void setListener(Listener listener) {
         this.listener = listener;
     }

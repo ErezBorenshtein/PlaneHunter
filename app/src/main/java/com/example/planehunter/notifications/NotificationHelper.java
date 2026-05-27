@@ -11,15 +11,27 @@ import androidx.core.app.NotificationCompat;
 
 import com.example.planehunter.R;
 
+/**
+ * Utility class to manage notification channels and build notifications for the application.
+ */
 public class NotificationHelper {
 
+    /** Channel ID for the foreground service notification. */
     public static final String CHANNEL_ID_FOREGROUND = "PlaneHunterForeground";
+    /** Channel ID for aircraft alert notifications. */
     public static final String CHANNEL_ID_ALERTS = "PlaneHunterAlerts";
+    /** Intent extra key indicating the app was opened from a notification. */
     public static final String FROM_NOTIFICATION = "from_notification";
+    /** Intent extra key for passing an aircraft's ICAO 24-bit address. */
     public static final String ICAO_24 = "icao24";
 
+    /** Static instance of NotificationManager for sending and managing notifications. */
     private static NotificationManager notificationManager;
 
+    /**
+     * Ensures that the required notification channels are created on the device.
+     * @param ctx The application context.
+     */
     public static void ensureChannels(Context ctx) {
 
          notificationManager = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -39,6 +51,13 @@ public class NotificationHelper {
         notificationManager.createNotificationChannel(alerts);
     }
 
+    /**
+     * Builds a notification to be used with a foreground service.
+     * @param ctx The application context.
+     * @param title The title of the notification.
+     * @param text The body text of the notification.
+     * @return A built Notification object.
+     */
     public static Notification buildForegroundNotification(Context ctx, String title, String text) {
         return new NotificationCompat.Builder(ctx, CHANNEL_ID_FOREGROUND)
                 .setContentTitle(title)
@@ -48,6 +67,13 @@ public class NotificationHelper {
                 .build();
     }
 
+    /**
+     * Displays a notification alert for a specific aircraft.
+     * @param context The application context.
+     * @param title The title of the alert.
+     * @param text The body text of the alert.
+     * @param icao24 The ICAO 24-bit address of the aircraft.
+     */
     public static void showAircraftAlert(Context context, String title, String text, String icao24){
         Intent intent = new Intent( context ,com.example.planehunter.ui.activities.MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);

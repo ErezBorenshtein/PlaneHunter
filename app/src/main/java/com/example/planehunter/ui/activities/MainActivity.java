@@ -6,7 +6,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -30,28 +29,43 @@ import com.example.planehunter.services.PlaneService;
 import com.example.planehunter.ui.dialogs.PlaneChooserSheet;
 import com.example.planehunter.ui.dialogs.PlaneSheet;
 import com.example.planehunter.ui.views.RadarView;
-import com.example.planehunter.notifications.NotificationHelper;
 
 import java.util.ArrayList;
 
+/**
+ * The main activity of the application.
+ * Manages the radar view, user location, plane data updates, and navigation to other screens.
+ */
 public class MainActivity extends AppCompatActivity {
 
+    /** Tag for logging. */
     private static final String TAG = "PlaneHunterDebug";
+    /** Request code for starting the capture game activity. */
     private static final int REQUEST_CAPTURE_GAME = 1;
 
+    /** View displaying the radar and planes. */
     private RadarView radarView;
+    /** Button to log out the user. */
     private Button btnLogout;
+    /** Button to open the leaderboard. */
     private Button btnLeaderBoard;
+    /** Button to open settings. */
     private Button btnSettings;
 
+    /** Flag indicating if the user is currently logging out. */
     private boolean isLoggingOut = false;
+    /** Flag indicating if the plane update receiver is registered. */
     private boolean isReceiverRegistered = false;
 
+    /** The plane currently being captured. */
     private Plane pendingCapturePlane;
 
+    /** The ICAO24 address of a plane to be automatically opened when received. */
     private String pendingSelectedIcao24 = null;
+    /** Progress bar shown while loading plane data. */
     private ProgressBar progLoadingPlanes;
 
+    /** Receiver for plane update broadcasts. */
     private final BroadcastReceiver planesReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -89,6 +103,10 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    /**
+     * Opens a detailed bottom sheet for the selected plane.
+     * @param plane The plane to show details for.
+     */
     private void openPlaneSheet(Plane plane) {
         if (plane == null) return;
 
@@ -107,7 +125,7 @@ public class MainActivity extends AppCompatActivity {
         sheet.show(getSupportFragmentManager(), "plane_sheet");
     }
 
-    // Foreground permissions (location + notifications on Android 13+)
+    /** Launcher for requesting foreground location and notification permissions. */
     private final ActivityResultLauncher<String[]> permissionsLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
                 if (!hasAllRequiredPermissions()) {
@@ -115,13 +133,13 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                startPlaneServiceIfNeeded();
+                startPlaneService();
                 setServicePollInterval(25_000L);
                 setAppForegroundState(true);
-                requestBackgroundLocationIfNeeded();
+                requestBackgroundLocation();
             });
 
-    // Background location permission (requested separately)
+    /** Launcher for requesting background location permission. */
     private final ActivityResultLauncher<String> backgroundLocationLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
                 if (!granted) {
@@ -169,10 +187,10 @@ public class MainActivity extends AppCompatActivity {
         loadCooldownPlanes();
 
         if (hasAllRequiredPermissions()) {
-            startPlaneServiceIfNeeded();
+            startPlaneService();
             setServicePollInterval(25_000L);
             setAppForegroundState(true);
-            requestBackgroundLocationIfNeeded();
+            requestBackgroundLocation();
         } else {
             ensurePermissions();
         }
@@ -351,10 +369,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void ensurePermissions() {
         if (hasAllRequiredPermissions()) {
-            startPlaneServiceIfNeeded();
+            startPlaneService();
             setServicePollInterval(25_000L);
             setAppForegroundState(true);
-            requestBackgroundLocationIfNeeded();
+            requestBackgroundLocation();
             return;
         }
 
@@ -383,7 +401,7 @@ public class MainActivity extends AppCompatActivity {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void requestBackgroundLocationIfNeeded() {
+    private void requestBackgroundLocation() {
         // Must request separately after foreground location is granted
 
         if (!hasForegroundLocationPermission()) {
@@ -409,7 +427,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void startPlaneServiceIfNeeded() {
+    private void startPlaneService() {
         if (!hasForegroundLocationPermission()) {
             Log.w(TAG, "Cannot start PlaneService without location permission");
             return;

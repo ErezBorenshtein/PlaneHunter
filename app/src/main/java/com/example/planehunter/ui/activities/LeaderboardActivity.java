@@ -21,21 +21,36 @@ import com.google.firebase.firestore.ListenerRegistration;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Activity that displays the global leaderboard.
+ * Shows the top players and the current user's personal rank if they are not in the top list.
+ */
 public class LeaderboardActivity extends AppCompatActivity {
 
+    /** The maximum number of top players to display in the leaderboard list. */
     private static final int LEADERBOARD_LIMIT = 5;
 
+    /** RecyclerView to display the list of top players. */
     private RecyclerView recyclerLeaderboard;
+    /** Adapter for the leaderboard RecyclerView. */
     private LeaderboardAdapter adapter;
 
+    /** Handler for interacting with Firebase services. */
     private FirebaseHandler firebaseHandler;
+    /** Registration for the real-time leaderboard listener to stop updates on destroy. */
     private ListenerRegistration leaderboardListener;
 
+    /** TextView displaying the current user's numerical rank. */
     private TextView textMyRank;
+    /** TextView displaying the current user's name. */
     private TextView textMyName;
+    /** TextView displaying the total number of aircraft captured by the current user. */
     private TextView textMyCaptures;
+    /** TextView displaying the total experience points (XP) of the current user. */
     private TextView textMyXp;
+    /** The layout container for the current user's personal rank information. */
     private View layoutMyRank;
+    /** The title TextView for the personal rank section. */
     private TextView textMyRankTitle;
 
     @Override
@@ -49,6 +64,9 @@ public class LeaderboardActivity extends AppCompatActivity {
         loadMyRank();
     }
 
+    /**
+     * Initializes the leaderboard RecyclerView and adapter.
+     */
     private void initLeaderboard() {
         recyclerLeaderboard = findViewById(R.id.recyclerLeaderboard);
         textMyRank = findViewById(R.id.textMyRank);
@@ -67,6 +85,9 @@ public class LeaderboardActivity extends AppCompatActivity {
 
     }
 
+    /**
+     * Loads the current user's rank and stats from Firebase.
+     */
     private void loadMyRank() {
         firebaseHandler.getMyLeaderboardRank(new FirebaseHandler.MyRankListener() {
             @Override
@@ -101,6 +122,9 @@ public class LeaderboardActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Sets up a real-time listener for the top leaderboard entries.
+     */
     private void listenToLeaderboard() {
         leaderboardListener = firebaseHandler
                 .getLeaderboardTop(LEADERBOARD_LIMIT)

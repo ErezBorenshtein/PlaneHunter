@@ -1,5 +1,6 @@
 package com.example.planehunter.ui.activities;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.widget.Button;
@@ -12,12 +13,21 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.planehunter.R;
 import com.example.planehunter.data.firebase.FirebaseHandler;
 
+/**
+ * Activity for user registration (Sign Up).
+ * Collects user name, email, and password to create a new account and profile in Firebase.
+ */
 public class SignUp extends AppCompatActivity {
 
+    /** Input field for the user's name. */
     private EditText etName;
+    /** Input field for the user's email address. */
     private EditText etEmail;
+    /** Input field for the user's password. */
     private EditText etPassword;
+    /** Button to trigger the sign-up process. */
     private Button btnSignup;
+    /** Link to navigate back to the login screen if the user already has an account. */
     private TextView tvHaveAccount;
 
     @Override
@@ -36,6 +46,9 @@ public class SignUp extends AppCompatActivity {
         tvHaveAccount.setOnClickListener(v -> finish());
     }
 
+    /**
+     * Validates registration data and creates a new user account and default profile in Firebase.
+     */
     private void doSignUp() {
         String name = etName.getText().toString().trim();
         String email = etEmail.getText().toString().trim();
@@ -49,6 +62,8 @@ public class SignUp extends AppCompatActivity {
             return;
         }
 
+        Intent intent = new Intent(this,MainActivity.class);
+
         FirebaseHandler.getInstance()
                 .signUpEmail(email, password)
                 .continueWithTask(t ->
@@ -56,7 +71,7 @@ public class SignUp extends AppCompatActivity {
                 )
                 .addOnSuccessListener(v -> {
                     Toast.makeText(this, "Account created!", Toast.LENGTH_SHORT).show();
-                    finish();
+                    startActivity(intent);
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Sign up failed: " + e.getMessage(), Toast.LENGTH_LONG).show()

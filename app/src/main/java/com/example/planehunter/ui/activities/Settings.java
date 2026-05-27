@@ -19,14 +19,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Activity for managing application settings, specifically alert categories.
+ * Allows the user to select which types of aircraft they want to receive notifications for.
+ */
 public class Settings extends AppCompatActivity {
 
+    /** Button to select all aircraft categories. */
     private MaterialButton btnSelectAll;
+    /** Button to clear all selected aircraft categories. */
     private MaterialButton btnClearAll;
+    /** Button to save the current selection of categories. */
     private MaterialButton btnSave;
+    /** Progress bar shown while fetching or saving data. */
     private ProgressBar progressBar;
+    /** Map linking category IDs to their corresponding checkbox views. */
     private Map<Long, MaterialCheckBox> categoryCheckboxes;
 
+    /** Handler for Firebase operations. */
     private FirebaseHandler firebaseHandler;
 
     @Override
@@ -51,6 +61,10 @@ public class Settings extends AppCompatActivity {
                 });
     }
 
+    /**
+     * Updates the UI checkboxes based on the provided list of category IDs.
+     * @param categories List of category IDs that should be checked.
+     */
     private void setSelected(List<Long> categories) {
         for (MaterialCheckBox cb : categoryCheckboxes.values()) {
             cb.setChecked(false);
@@ -64,6 +78,9 @@ public class Settings extends AppCompatActivity {
         }
     }
 
+    /**
+     * Initializes views and sets up click listeners.
+     */
     private void init() {
         firebaseHandler = FirebaseHandler.getInstance();
 
