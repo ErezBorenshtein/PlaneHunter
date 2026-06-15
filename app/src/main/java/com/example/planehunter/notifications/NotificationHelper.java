@@ -10,6 +10,7 @@ import android.content.Intent;
 import androidx.core.app.NotificationCompat;
 
 import com.example.planehunter.R;
+import com.example.planehunter.ui.activities.MainActivity;
 
 /**
  * Utility class to manage notification channels and build notifications for the application.
@@ -34,7 +35,7 @@ public class NotificationHelper {
      */
     public static void ensureChannels(Context ctx) {
 
-         notificationManager = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationManager = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager == null) return;
 
         NotificationChannel forground = new NotificationChannel(
@@ -75,8 +76,8 @@ public class NotificationHelper {
      * @param icao24 The ICAO 24-bit address of the aircraft.
      */
     public static void showAircraftAlert(Context context, String title, String text, String icao24){
-        Intent intent = new Intent( context ,com.example.planehunter.ui.activities.MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent intent = new Intent( context , MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP); //returns to main activity. if already open dont create another one
 
         intent.putExtra(FROM_NOTIFICATION, true);
         intent.putExtra(ICAO_24, icao24);

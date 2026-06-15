@@ -88,8 +88,8 @@ public class MainActivity extends AppCompatActivity {
             radarView.setUserLocation(userLat, userLon);
             radarView.setPlanes(planes);
 
-            radarView.post(()->{
-                progLoadingPlanes.setVisibility(View.GONE);
+            radarView.post(()->{ // post the request to MainLooper(UI Thread)
+                progLoadingPlanes.setVisibility(View.GONE);// when finished hide the progress bar
             });
 
             if (pendingSelectedIcao24 != null) {
@@ -184,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
 
         registerPlanesReceiver();
-        loadCooldownPlanes();
+        loadCooldownPlanes(); //from firebase
 
         if (hasAllRequiredPermissions()) {
             startPlaneService();
@@ -206,13 +206,14 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (hasForegroundLocationPermission()) {
-            setServicePollInterval(60_000L * 3);
+            setServicePollInterval(60_000L * 3); // to reduce API usage
             setAppForegroundState(false);
         }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        //from CaptureGameActivity
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode != REQUEST_CAPTURE_GAME || resultCode != RESULT_OK || data == null) {
@@ -303,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
 
         PlaneChooserSheet sheet = PlaneChooserSheet.newInstance(planes);
         sheet.setCooldownIcaos(radarView.getCooldownIcaosCopy());
-        sheet.setListener(this::openPlaneSheet);
+        sheet.setListener(this::openPlaneSheet); //Method reference: selected plane -> openPlaneSheet(plane)
         sheet.show(getSupportFragmentManager(), "plane_chooser");
     }
 
